@@ -1,13 +1,11 @@
 import { asyncHandler } from "../utils/asyncHandler"
 import { ApiError } from '../utils/ApiError'
 import { ApiResponse } from "../utils/ApiResponse"
-import { uploadCloudinary } from "../utils/cloudinary"
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose"
 import { User } from "../models/user.model";
 import { Student } from "../models/student.model";
 import { Admin } from "../models/admin.model";
-import nodemailer from "nodemailer";
 import crypto from "crypto"; //built in node.js module used to generate secure random tokens
 import { sendEmail } from "../utils/sendEmail.js";
 
@@ -110,7 +108,7 @@ const loginUser = asyncHandler(async (req, res) => {
         throw new ApiError(404, "User does not exist")
     }
 
-    const isPasswordValid = await user.isPasswordCorrect(password)
+    const isPasswordValid = await User.isPasswordCorrect(password)
 
     //check if password is working or not
     if (!isPasswordValid) {
@@ -228,16 +226,16 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             secure: true
         }
 
-        const { accessToken, newRefreshToken } = await generateAccessAndRefereshTokens(user._id)
+        const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(user._id)
 
         return res
             .status(200)
             .cookie("accessToken", accessToken, options)
-            .cookie("refreshToken", newRefreshToken, options)
+            .cookie("refreshToken", refreshToken, options)
             .json(
                 new ApiResponse(
                     200,
-                    { accessToken, refreshToken: newRefreshToken },
+                    { accessToken, refreshToken},
                     "Access token refreshed"
                 )
             )
@@ -291,7 +289,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
     user.resetPasswordExpiry = Date.now() + 10 * 60 * 1000;
 
     await user.save({ validateBeforeSave: false });
-    const resetUrl = `http://localhost:${PORT}/reset-password/${resetToken}`;
+    const resetUrl = `http://localhost:${process.env.PORT}/reset-password/${resetToken}`;
 
     //send email
     await sendEmail({

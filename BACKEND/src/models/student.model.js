@@ -28,6 +28,11 @@ const studentSchema = new Schema(
             type: Date,
             default: Date.now,
         },
+        isDocumentUploadAllowed: {
+            type: Boolean,
+            default: false
+        },
+
     },
     { timestamps: true }
 );
