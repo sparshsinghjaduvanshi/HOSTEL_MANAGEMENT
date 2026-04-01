@@ -8,7 +8,10 @@ import { User } from "../models/user.model";
 import { Student } from "../models/student.model";
 import { Admin } from "../models/admin.model";
 import nodemailer from "nodemailer";
- 
+import crypto from "crypto"; //built in node.js module used to generate secure random tokens
+import { sendEmail } from "../utils/sendEmail.js";
+
+
 
 const generateAccessAndRefereshTokens = async (userId) => {
     try {
@@ -114,6 +117,10 @@ const loginUser = asyncHandler(async (req, res) => {
         throw new ApiError(401, "Invalid user credentials")
     }
 
+    if (!user.isActive) {
+        throw new ApiError(403, "Account is deactivated");
+    }
+
     //generating access and refresh Token
     const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(user._id)
 
@@ -140,8 +147,62 @@ const loginUser = asyncHandler(async (req, res) => {
 
 })
 
+const logoutUser = asyncHandler(async (req, res) => {
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $unset: {
+                refreshToken: 1// this remove the field from document
+            }
+        },
+        {
+            new: true
+        }
+    )
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(new ApiResponse(200, {}, "User logged Out"))
+})
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+    const user = req.user;
+    if (!user) {
+        throw new ApiError(400, "Error fetching user data")
+    }
+
+    let roleData = null;
+    //fetching role based data
+    if (user.role === "student") {
+        roleData = await Student.findOne({ userId: user._id })
+    }
+    if (user.role === "admin") {
+        roleData = await Admin.findOne({ userId: user._id })
+    }
+    //for staff too
+    if (!roleData) {
+        throw new ApiError(404, "Role data not found");
+    }
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, {
+            user,
+            roleData
+        },
+            "User fetched successfully."))
+
+})
+
 const refreshAccessToken = asyncHandler(async (req, res) => {
-    const incomingRefreshToken = req.cookie.refreshToken || req.body.refreshToken
+    const incomingRefreshToken = req.cookie?.refreshToken || req.body.refreshToken
 
     if (!incomingRefreshToken) {
         throw new ApiError(400, "unauthorized request")
@@ -206,15 +267,68 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, {}, "Password changed successfully"))
 })
 
-const forgotPassword = asyncHandler( async(req, res)=>{
+const forgotPassword = asyncHandler(async (req, res) => {
     //getting the inputs
-    const {email} = req.body
-    const user = await User.findOne({email})
+    const { email } = req.body
+    if (!email) {
+        throw new ApiError(400, "Email is required");
+    }
 
-    //send the otp to the phone number and then take the input for new password
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail })
+    if (!user) {
+        return res.status(200)
+            .json(new ApiResponse(200, {}, "If this email existes, a reset link has been sent"))
+    }
+    //generate token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto
+        .createHash("sha256")
+        .update(resetToken)
+        .digest("hex");
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpiry = Date.now() + 10 * 60 * 1000;
+
+    await user.save({ validateBeforeSave: false });
+    const resetUrl = `http://localhost:${PORT}/reset-password/${resetToken}`;
+
+    //send email
+    await sendEmail({
+        to: user.email,
+        subject: "Password Reset Tequest",
+        text: `Reset you password using this link: ${resetUrl}`,
+        html: `
+        <h2>Password Reset</h2>
+        <p>Click below to reset your password:</p>
+            <a href="${resetUrl}">${resetUrl}</a>`
+    })
+    return res.status(200).json(
+        new ApiResponse(200, {}, "Reset link sent to email")
+    );
 })
 
-export { registerStudent, loginUser, refreshAccessToken, changeCurrentPassword };
+const deleteUser = asyncHandler(async (req, res) => {
+    const { id } = req.params
+    const user = await User.findById(id)
+    if (!user) {
+        throw new ApiError(400, "Data is not received properly")
+    }
+
+    if (user.role === "admin") {
+        throw new ApiError(403, "Cannot delete admin");
+    }
+
+    // ✅ soft delete
+    user.isActive = false;
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(200).json(
+        new ApiResponse(200, {}, "User deactivated successfully")
+    );
+})
+
+export { registerStudent, loginUser, logoutUser, getCurrentUser, refreshAccessToken, changeCurrentPassword, forgotPassword, deleteUser };
 
 
 
