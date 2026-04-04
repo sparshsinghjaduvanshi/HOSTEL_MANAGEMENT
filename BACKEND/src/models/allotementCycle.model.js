@@ -32,10 +32,14 @@ const allotmentCycleSchema = new Schema(
       index: true
     },
 
-    // 🔥 optional but VERY useful
+    //  optional but VERY useful
     maxApplicationsPerStudent: {
       type: Number,
       default: 1
+    },
+    applicationOpen: {
+      type: Boolean,
+      default: false
     }
 
   },

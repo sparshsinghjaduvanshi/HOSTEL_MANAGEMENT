@@ -3,7 +3,7 @@ import mongoose, { Schema } from 'mongoose'
 const documentSchema = new Schema({
     studentId: {
         type: Schema.Types.ObjectId,
-        ref: "User",
+        ref: "Student",
         required: true
     },
     applicationId: {

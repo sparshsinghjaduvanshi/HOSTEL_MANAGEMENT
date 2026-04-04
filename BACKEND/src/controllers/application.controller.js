@@ -17,7 +17,11 @@ const applyForHostel = asyncHandler(async (req, res) => {
   const { preferences } = req.body;
 
   //  1. Get active cycle
-  const cycle = await AllotmentCycle.findOne({ status: "active" });
+  const cycle = await AllotmentCycle.findOne({
+    status: "active",
+    applicationOpen: true
+  });
+
 
   if (!cycle) {
     throw new ApiError(400, "No active allotment cycle");
@@ -238,15 +242,15 @@ const reviewApplication = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Application not found");
   }
 
-  if (application.wardenDecision.status !== "pending") {
+  if (application.wardenDecision.status !== "pending" && req.user.role !== "admin") {
     throw new ApiError(400, "Application already reviewed");
   }
 
-  // ✅ Update decision
+  //  Update decision
   application.wardenDecision.status =
     action === "approve" ? "approved" : "rejected";
 
-  application.wardenDecision.decidedBy = staffId;
+  application.wardenDecision.decidedBy = req.user._id;
   application.wardenDecision.decidedAt = new Date();
   application.wardenDecision.remarks = remarks || "";
 
