@@ -327,7 +327,3 @@ const deleteUser = asyncHandler(async (req, res) => {
 })
 
 export { registerStudent, loginUser, logoutUser, getCurrentUser, refreshAccessToken, changeCurrentPassword, forgotPassword, deleteUser };
-
-
-
-

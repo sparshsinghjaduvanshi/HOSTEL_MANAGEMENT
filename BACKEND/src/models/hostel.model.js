@@ -20,6 +20,11 @@ const hostelSchema = new Schema(
       default: 0,
       min: 0,
     },
+    gender: {
+      type: String,
+      enum: ["male", "female"],
+      required: true
+    }
   },
   {
     timestamps: true,

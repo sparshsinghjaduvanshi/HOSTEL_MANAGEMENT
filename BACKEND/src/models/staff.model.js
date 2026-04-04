@@ -20,7 +20,7 @@ const staffSchema = new Schema({
     },
     assignedHostelId: {
         type: Schema.Types.ObjectId,
-        ref: "Hoste",
+        ref: "Hostel",
         required: true
     },
     hiredAt: {

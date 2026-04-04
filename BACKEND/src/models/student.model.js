@@ -32,6 +32,11 @@ const studentSchema = new Schema(
             type: Boolean,
             default: false
         },
+        gender: {
+            type: String,
+            enum: ["male", "female"],
+            required: true
+        }
 
     },
     { timestamps: true }
