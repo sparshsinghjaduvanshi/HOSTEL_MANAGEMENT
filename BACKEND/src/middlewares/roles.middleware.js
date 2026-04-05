@@ -1,3 +1,4 @@
+import { Staff } from "../models/staff.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -14,3 +15,18 @@ export const requireStudent = asyncHandler( async (req, res, next) => {
     }
     next();
 })
+
+export const requireStaff = asyncHandler(async (req, res, next) => {
+  if (!req.user || req.user.role !== "staff") {
+    throw new ApiError(403, "Staff access required");
+  }
+
+  const staff = await Staff.findOne({ userId: req.user._id });
+
+  if (!staff) {
+    throw new ApiError(403, "Staff record not found");
+  }
+
+  req.staff = staff;
+  next();
+});

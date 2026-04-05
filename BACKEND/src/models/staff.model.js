@@ -15,7 +15,7 @@ const staffSchema = new Schema({
     },
     role: {
         type: String,
-        enum: ["Security", "CareTaker", "Warden"],
+        enum: ["Cleaner", "Carpenter", "Electrician", "CareTaker", "Warden"],
         required: true
     },
     assignedHostelId: {

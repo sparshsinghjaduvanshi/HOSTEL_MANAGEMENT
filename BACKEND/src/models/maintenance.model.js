@@ -38,14 +38,21 @@ const maintenanceSchema = new Schema(
 
     status: {
       type: String,
-      enum: ["pending", "forwarded", "in-progress", "resolved"],
+      enum: ["pending", "in-progress", "work-done", "resolved"],
       default: "pending",
     },
 
     resolvedAt: {
       type: Date,
     },
+    category: {
+      type: String,
+      enum: ["cleaning", "electrical", "carpentry", "general"],
+      required: true,
+      index: true
+    }
   },
+
   {
     timestamps: true, // gives createdAt automatically
   }

@@ -13,49 +13,49 @@ import {
 import { deleteUser } from "../controllers/user.controller.js";
 
 import { verifyJWT } from "../middlewares/auth.middleware.js";
-import { isAdmin } from "../middlewares/admin.middleware.js";
+import requireAdmin  from "../middlewares/roles.middleware.js"
 
 const router = express.Router();
 
 /**
  *  ADMIN PROFILE
  */
-router.get("/me", verifyJWT, isAdmin, getAdminProfile);
+router.get("/me", verifyJWT, requireAdmin, getAdminProfile);
 
 /**
  *  DASHBOARD
  */
-router.get("/dashboard", verifyJWT, isAdmin, getAdminDashboard);
+router.get("/dashboard", verifyJWT, requireAdmin, getAdminDashboard);
 
 /**
  *  STUDENTS
  */
-router.get("/students", verifyJWT, isAdmin, getAllStudentsAdmin);
+router.get("/students", verifyJWT, requireAdmin, getAllStudentsAdmin);
 
 /**
  *  STAFF MANAGEMENT
  */
-router.get("/staff", verifyJWT, isAdmin, getAllStaff);
-router.post("/staff", verifyJWT, isAdmin, createStaff);
-router.put("/staff/:id", verifyJWT, isAdmin, updateStaff);
-router.delete("/users/:id", verifyJWT, isAdmin, deleteUser);
+router.get("/staff", verifyJWT, requireAdmin, getAllStaff);
+router.post("/staff", verifyJWT, requireAdmin, createStaff);
+router.put("/staff/:id", verifyJWT, requireAdmin, updateStaff);
+router.delete("/users/:id", verifyJWT, requireAdmin, deleteUser);
 
 /**
  *  APPLICATIONS
  */
-router.get("/applications", verifyJWT, isAdmin, getAllApplicationsAdmin);
+router.get("/applications", verifyJWT, requireAdmin, getAllApplicationsAdmin);
 
 /**
  *  SYSTEM CONTROL
  */
-router.post("/application-window", verifyJWT, isAdmin, toggleApplicationWindow);
+router.post("/application-window", verifyJWT, requireAdmin, toggleApplicationWindow);
 
 import {
   getAllApplications,
   reviewApplication,
   startAllotment,
   reAllotWaitlisted,
-  getAllottedStudents
+  getAllottedStudentsAdmin
 } from "../controllers/application.controller.js";
 
 /**
@@ -63,19 +63,20 @@ import {
  */
 
 // View all applications
-router.get("/applications", verifyJWT, isAdmin, getAllApplications);
+router.get("/applications", verifyJWT, requireAdmin, getAllApplications);
 
 // Approve / Reject application
-router.post("/applications/review", verifyJWT, isAdmin, reviewApplication);
+router.post("/applications/review", verifyJWT, requireAdmin, reviewApplication);
 
 // Start allotment process
-router.post("/allotment/start", verifyJWT, isAdmin, startAllotment);
+router.post("/allotment/start", verifyJWT, requireAdmin, startAllotment);
 
 // Re-allot waitlisted students
-router.post("/allotment/reallot", verifyJWT, isAdmin, reAllotWaitlisted);
+router.post("/allotment/reallot", verifyJWT, requireAdmin, reAllotWaitlisted);
 
 // View allotted students
-router.get("/allotment/allotted", verifyJWT, isAdmin, getAllottedStudents);
+router.get("/allotment/allotted", verifyJWT, requireAdmin, getAllottedStudentsAdmin
+);
 
 
 export default router;

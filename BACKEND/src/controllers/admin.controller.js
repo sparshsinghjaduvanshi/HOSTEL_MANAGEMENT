@@ -2,6 +2,7 @@ import { User } from "../models/user.model.js";
 import { Student } from "../models/student.model.js";
 import { Staff } from "../models/staff.model.js";
 import { Application } from "../models/application.model.js";
+import { AllotmentCycle } from "../models/allotmentCycle.model.js";
 import { Admin } from "../models/admin.model.js";
 
 import asyncHandler from "../utils/asyncHandler.js";
@@ -209,6 +210,40 @@ const updateStaff = asyncHandler(async (req, res) => {
   }
 });
 
+const getAllottedStudentsAdmin = asyncHandler(async (req, res) => {
+  // 1. Get active or latest completed cycle
+  const cycle = await AllotmentCycle.findOne({
+    status: { $in: ["active", "completed"] }
+  }).sort({ createdAt: -1 });
+
+  if (!cycle) {
+    throw new ApiError(404, "No allotment cycle found");
+  }
+
+  // 2. Fetch allotted students for that cycle
+  const applications = await Application.find({
+    cycleId: cycle._id,
+    isAllotted: true
+  })
+    .populate({
+      path: "studentId",
+      populate: {
+        path: "userId",
+        select: "fullName email"
+      }
+    })
+    .populate("allottedHostel")
+    .populate("roomId")
+    .sort({ createdAt: -1 });
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      cycleId: cycle._id,
+      total: applications.length,
+      students: applications
+    }, "Allotted students fetched successfully")
+  );
+});
 
 export {
   getAdminProfile,
@@ -218,5 +253,6 @@ export {
   getAdminDashboard,
   toggleApplicationWindow,
   createStaff,
-  updateStaff
+  updateStaff,
+  getAllottedStudentsAdmin
 };
