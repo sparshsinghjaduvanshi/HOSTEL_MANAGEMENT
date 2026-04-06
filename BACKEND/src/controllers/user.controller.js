@@ -33,7 +33,7 @@ const registerStudent = asyncHandler(async (req, res) => {
     try {
         let { fullName, email, password, phone, enrollmentNo } = req.body;
 
-        // ✅ 1. Basic validation
+        //  1. Basic validation
         if ([fullName, email, password, phone, enrollmentNo].some(f => f?.trim() === "")) {
             throw new ApiError(400, "All fields are required");
         }
@@ -108,7 +108,7 @@ const loginUser = asyncHandler(async (req, res) => {
         throw new ApiError(404, "User does not exist")
     }
 
-    const isPasswordValid = await User.isPasswordCorrect(password)
+    const isPasswordValid = await user.isPasswordCorrect(password)
 
     //check if password is working or not
     if (!isPasswordValid) {

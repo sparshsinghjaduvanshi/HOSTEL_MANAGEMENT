@@ -8,7 +8,8 @@ import {
   getAdminDashboard,
   toggleApplicationWindow,
   createStaff,
-  updateStaff
+  updateStaff,
+  updateStaffPhoto
 } from "../controllers/admin.controller.js";
 import { deleteUser } from "../controllers/user.controller.js";
 
@@ -39,7 +40,9 @@ router.get("/staff", verifyJWT, requireAdmin, getAllStaff);
 router.post("/staff", verifyJWT, requireAdmin, createStaff);
 router.put("/staff/:id", verifyJWT, requireAdmin, updateStaff);
 router.delete("/users/:id", verifyJWT, requireAdmin, deleteUser);
-
+router.patch("/photo", verifyJWT, requireAdmin, upload.single("photo"), // field name must match frontend
+  updateStaffPhoto
+);
 /**
  *  APPLICATIONS
  */

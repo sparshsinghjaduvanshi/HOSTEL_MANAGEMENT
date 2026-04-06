@@ -42,6 +42,33 @@ const getMyProfile = asyncHandler(async (req, res) => {
         )
 })
 
+const updateProfile = asyncHandler(async (req, res) => {
+  const { fullName, enrollmentNo, phone } = req.body;
+
+  // 1. Build update object dynamically
+  const updateFields = {};
+
+  if (fullName) updateFields.fullName = fullName;
+  if (enrollmentNo) updateFields.enrollmentNo = enrollmentNo;
+  if (phone) updateFields.phone = phone;
+
+  // 2. Check if nothing to update
+  if (Object.keys(updateFields).length === 0) {
+    throw new ApiError(400, "At least one field is required to update");
+  }
+
+  // 3. Update
+  const student = await Student.findByIdAndUpdate(
+    req.student?._id,
+    { $set: updateFields },
+    { new: true, runValidators: true }
+  );
+
+  return res.status(200).json(
+    new ApiResponse(200, student, "Account details updated successfully")
+  );
+});
+
 const uploadDocument = asyncHandler(async (req, res) => {
     const user = req.user;
 
@@ -78,7 +105,7 @@ const uploadDocument = asyncHandler(async (req, res) => {
     if (req.file.mimetype !== "application/pdf") {
         throw new ApiError(400, "Only PDF allowed");
     }
-
+    
     const existingDoc = await Document.findOne({
         studentId: student._id,
         type
@@ -161,7 +188,6 @@ const respondToRoomChange = asyncHandler(async (req, res) => {
     });
 });
 
-
 const getMyRoomChangeRequests = asyncHandler(async (req, res) => {
     const student = await Student.findOne({ userId: req.user._id });
 
@@ -203,5 +229,6 @@ export {
     uploadDocument,
     createRoomChangeRequest,
     respondToRoomChange,
-    getMyRoomChangeRequests
+    getMyRoomChangeRequests,
+    updateProfile
 }

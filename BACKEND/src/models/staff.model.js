@@ -18,6 +18,9 @@ const staffSchema = new Schema({
         enum: ["Cleaner", "Carpenter", "Electrician", "CareTaker", "Warden"],
         required: true
     },
+    photo: {
+      type: String, // URL (Cloudinary/S3)
+    },
     assignedHostelId: {
         type: Schema.Types.ObjectId,
         ref: "Hostel",

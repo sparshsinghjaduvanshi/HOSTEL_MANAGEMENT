@@ -1,0 +1,25 @@
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.jsx'
+import { Route, createBrowserRouter, RouterProvider, createRoutesFromElements } from 'react-router-dom'
+import Layout from './Layout.jsx'
+
+
+
+import Auth from "./pages/Auth.jsx"
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route path="/" element={<Layout />}>
+      <Route path="/auth" element={<Auth />} />
+    </Route>
+  )
+)
+
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+     <RouterProvider router={router} />
+  </StrictMode>,
+)

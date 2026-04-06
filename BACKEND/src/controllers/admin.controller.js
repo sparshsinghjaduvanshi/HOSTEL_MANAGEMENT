@@ -8,6 +8,7 @@ import { Admin } from "../models/admin.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
+import { uploadOnCLoudinary } from "../utils/cloudinary.js";
 
 const getAdminProfile = asyncHandler(async (req, res) => {
   const admin = await Admin.findOne({ userId: req.user._id })
@@ -148,7 +149,6 @@ const updateStaff = asyncHandler(async (req, res) => {
     phone,
     role,
     assignedHostelId,
-    hostelType
   } = req.body;
 
   const session = await mongoose.startSession();
@@ -178,11 +178,12 @@ const updateStaff = asyncHandler(async (req, res) => {
 
     await user.save({ session, validateBeforeSave: false });
 
+
     // 4. Update STAFF fields
     if (phone) staff.phone = phone;
     if (role) staff.role = role;
     if (assignedHostelId) staff.assignedHostelId = assignedHostelId;
-    if (hostelType) staff.hostelType = hostelType;
+
 
     await staff.save({ session });
 
@@ -209,6 +210,35 @@ const updateStaff = asyncHandler(async (req, res) => {
     throw error;
   }
 });
+
+const updateStaffPhoto = asyncHandler(async (req, res) => {
+  const photoLocalPath = req.file?.path
+  if (!photoLocalPath) {
+    throw new ApiError(400, "Photo file is missing")
+  }
+
+  const photo = await uploadOnCLoudinary(photoLocalPath)
+  if (!photo.url) {
+    throw new ApiError
+      (400, "Error while uploading on avatar")
+  }
+
+  const staff = await Staff.findByIdAndUpdate(
+    req.staff?._id,
+    {
+      $set: {
+        photo: photo.url
+      }
+    },
+    { new: true }
+  ).select("-password")
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, staff, "Photo is updated successfully")
+    )
+})
 
 const getAllottedStudentsAdmin = asyncHandler(async (req, res) => {
   // 1. Get active or latest completed cycle
@@ -254,5 +284,6 @@ export {
   toggleApplicationWindow,
   createStaff,
   updateStaff,
+  updateStaffPhoto,
   getAllottedStudentsAdmin
 };

@@ -23,7 +23,9 @@ const studentSchema = new Schema(
             unique: true,
             trim: true,
         },
-
+        photo: {
+            type: String, // URL (Cloudinary/S3)
+        },
         enrollmentDate: {
             type: Date,
             default: Date.now,

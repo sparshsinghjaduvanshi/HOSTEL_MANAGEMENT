@@ -25,10 +25,6 @@ const userSchema = new Schema(
       minlength: 6,
     },
 
-    photo: {
-      type: String, // URL (Cloudinary/S3)
-    },
-
     role: {
       type: String,
       enum: ["admin", "staff", "student"],
