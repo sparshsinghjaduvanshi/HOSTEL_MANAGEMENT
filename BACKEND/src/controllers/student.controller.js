@@ -1,7 +1,8 @@
-import { asyncHandler } from "../utils/asyncHandler"
-import { ApiError } from '../utils/ApiError'
-import { ApiResponse } from "../utils/ApiResponse"
-import { uploadOnCLoudinary } from "../utils/cloudinary";
+import { asyncHandler } from "../utils/asyncHandler.js"
+import { ApiError } from '../utils/ApiError.js'
+import { ApiResponse } from "../utils/ApiResponse.js"
+import { uploadOnCLoudinary } from "../utils/cloudinary.js";
+import { createLog } from "../services/log.service.js";
 
 import { User } from "../models/user.model";
 import { Student } from "../models/student.model";
@@ -19,6 +20,12 @@ const getMyProfile = asyncHandler(async (req, res) => {
     if (!student) {
         throw new ApiError(400, "error fetching student data in student controller")
     }
+    await createLog(req, {
+        userId: req.user._id,
+        action: "VIEW",
+        targetTable: "Student",
+        newData: { type: "MY_PROFILE" }
+    });
 
     return res
         .status(200)
@@ -34,7 +41,7 @@ const getMyProfile = asyncHandler(async (req, res) => {
                     },
                     student: {
                         phone: student.phone,
-                        enrollmentId: Student.enrollmentNo,
+                        enrollmentId: student.enrollmentNo,
                     }
                 },
                 "Profile fetched successfully!"
@@ -44,23 +51,39 @@ const getMyProfile = asyncHandler(async (req, res) => {
 
 const updateProfile = asyncHandler(async (req, res) => {
     const { fullName, enrollmentNo, phone } = req.body;
+    const user = await User.findById(req.user._id);
+
+
+    if (!fullName && !enrollmentNo && !phone) {
+        throw new ApiError(400, "At least one field is required to update");
+    }
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    if (fullName) user.fullName = fullName;
+    await user.save();
 
     // 1. Build update object dynamically
     const updateFields = {};
 
-    if (fullName) updateFields.fullName = fullName;
     if (enrollmentNo) updateFields.enrollmentNo = enrollmentNo;
     if (phone) updateFields.phone = phone;
 
-    // 2. Check if nothing to update
-    if (Object.keys(updateFields).length === 0) {
-        throw new ApiError(400, "At least one field is required to update");
-    }
-    const oldStudent = await Student.findById(req.student?._id);
 
+    const studentDoc = await Student.findOne({ userId: req.user._id });
+
+    if (!studentDoc) {
+        throw new ApiError(404, "Student not found");
+    }
+
+
+
+    const oldStudent = studentDoc.toObject();
     // 3. Update
     const student = await Student.findByIdAndUpdate(
-        req.student?._id,
+        studentDoc._id,
         { $set: updateFields },
         { new: true, runValidators: true }
     );
@@ -70,8 +93,14 @@ const updateProfile = asyncHandler(async (req, res) => {
         action: "UPDATE_PROFILE",
         targetTable: "Student",
         targetId: student._id,
-        oldData: oldStudent,
-        newData: student
+        oldData: {
+            student: oldStudent,
+            user: { fullName: req.user.fullName }
+        },
+        newData: {
+            student: student.toObject(),
+            user: { fullName }
+        }
     });
 
     return res.status(200).json(
@@ -100,6 +129,13 @@ const uploadDocument = asyncHandler(async (req, res) => {
 
     if (!type) {
         throw new ApiError(400, "Document type is required");
+    }
+
+    if (applicationId) {
+        const app = await Application.findById(applicationId);
+        if (!app) {
+            throw new ApiError(404, "Invalid application ID");
+        }
     }
 
     const allowedTypes = ["aadhaar", "address_proof", "id_card"];
@@ -162,6 +198,13 @@ const uploadDocument = asyncHandler(async (req, res) => {
 const createRoomChangeRequest = asyncHandler(async (req, res) => {
     const { targetStudentId, reason } = req.body;
 
+    if (targetStudentId) {
+        const target = await Student.findById(targetStudentId);
+        if (!target) {
+            throw new ApiError(404, "Target student not found");
+        }
+    }
+
     const student = await Student.findOne({ userId: req.user._id });
 
     if (!student) {
@@ -198,6 +241,9 @@ const respondToRoomChange = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     const student = await Student.findOne({ userId: req.user._id });
+    if (!student) {
+        throw new ApiError(404, "Student not found");
+    }
 
     const request = await RoomChangeRequest.findById(id);
 
@@ -258,6 +304,13 @@ const getMyRoomChangeRequests = asyncHandler(async (req, res) => {
             }
         })
         .sort({ createdAt: -1 });
+
+    await createLog(req, {
+        userId: req.user._id,
+        action: "VIEW",
+        targetTable: "RoomChangeRequest",
+        newData: { type: "MY_REQUESTS" }
+    });
 
     return res.status(200).json({
         success: true,

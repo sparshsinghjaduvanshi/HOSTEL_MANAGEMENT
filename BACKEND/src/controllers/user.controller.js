@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from "../utils/ApiResponse.js"
@@ -8,7 +9,7 @@ import { Student } from "../models/student.model.js";
 import { Admin } from "../models/admin.model.js";
 import crypto from "crypto"; //built in node.js module used to generate secure random tokens
 import { sendEmail } from "../utils/sendEmail.js";
-
+import { OTP } from "../models/otp.model.js";
 
 
 const generateAccessAndRefereshTokens = async (userId) => {
@@ -26,6 +27,7 @@ const generateAccessAndRefereshTokens = async (userId) => {
     }
 }
 
+
 const registerStudent = asyncHandler(async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -33,21 +35,25 @@ const registerStudent = asyncHandler(async (req, res) => {
     try {
         let { fullName, email, password, phone, enrollmentNo, otp } = req.body;
 
-        // ✅ 1. Validation
-        if ([fullName, email, password, phone, enrollmentNo, otp].some(f => !f || f.trim() === "")) {
+        // 🔥 1. Validate input
+        if (
+            [fullName, email, password, phone, enrollmentNo, otp].some(
+                (field) => !field || field.trim() === ""
+            )
+        ) {
             throw new ApiError(400, "All fields including OTP are required");
         }
 
-        // ✅ 2. Normalize
+        // 🔥 2. Normalize data
         email = email.toLowerCase().trim();
         fullName = fullName.trim();
 
-        // ✅ 3. Email restriction
+        // 🔥 3. Restrict email domain
         if (!email.endsWith("@curaj.ac.in")) {
             throw new ApiError(400, "Use your college email");
         }
 
-        // ✅ 4. Verify OTP
+        // 🔥 4. Verify OTP
         const otpRecord = await OTP.findOne({ email }).sort({ createdAt: -1 });
 
         if (!otpRecord) {
@@ -62,19 +68,24 @@ const registerStudent = asyncHandler(async (req, res) => {
             throw new ApiError(400, "OTP expired");
         }
 
-        // ✅ 5. Check existing user (inside transaction)
+        // 🔥 5. Check existing user
         const existedUser = await User.findOne({ email }).session(session);
         if (existedUser) {
             throw new ApiError(400, "User already exists with this email");
         }
 
-        // ✅ 6. Create User
-        const user = await User.create([{
-            fullName,
-            email,
-            password,
-            role: "student"
-        }], { session });
+        // 🔥 6. Create User
+        const user = await User.create(
+            [
+                {
+                    fullName,
+                    email,
+                    password,
+                    role: "student",
+                },
+            ],
+            { session }
+        );
 
         const createdUser = user[0];
 
@@ -82,31 +93,37 @@ const registerStudent = asyncHandler(async (req, res) => {
             throw new ApiError(500, "Failed to create user");
         }
 
-        // ✅ 7. Create Student
-        await Student.create([{
-            userId: createdUser._id,
-            phone,
-            enrollmentNo
-        }], { session });
+        // 🔥 7. Create Student
+        await Student.create(
+            [
+                {
+                    userId: createdUser._id,
+                    phone,
+                    enrollmentNo,
+                },
+            ],
+            { session }
+        );
 
-        // ✅ 8. Delete OTP after successful verification
+        // 🔥 8. Delete OTP after success
         await OTP.deleteMany({ email });
 
-        // ✅ 9. Commit transaction
+        // 🔥 9. Commit transaction
         await session.commitTransaction();
         session.endSession();
 
-        // ✅ 10. Logging (outside transaction)
+        // 🔥 10. Logging
         await createLog(req, {
             action: "REGISTER",
             targetTable: "User",
             targetId: createdUser._id,
             newData: {
                 email: createdUser.email,
-                role: createdUser.role
-            }
+                role: createdUser.role,
+            },
         });
 
+        // 🔥 11. Response
         return res.status(201).json(
             new ApiResponse(201, createdUser, "Student registered successfully")
         );
@@ -123,8 +140,8 @@ const loginUser = asyncHandler(async (req, res) => {
     const { email, password } = req.body
 
     //check if email and password is entered or not
-    if (!(password || email)) {
-        throw new ApiError(400, "username or email is required")
+    if (!email || !password) {
+        throw new ApiError(400, "Email and password are required");
     }
 
     //email normalization
@@ -249,7 +266,12 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     if (!roleData) {
         throw new ApiError(404, "Role data not found");
     }
-
+    await createLog(req, {
+        userId: user._id,
+        action: "VIEW",
+        targetTable: "User",
+        newData: { type: "CURRENT_USER" }
+    });
     return res
         .status(200)
         .json(new ApiResponse(200, {
@@ -261,7 +283,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 })
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
-    const incomingRefreshToken = req.cookie?.refreshToken || req.body.refreshToken
+    const incomingRefreshToken = req.cookies?.refreshToken || req.body.refreshToken
 
     if (!incomingRefreshToken) {
         throw new ApiError(400, "unauthorized request")
@@ -288,7 +310,12 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
         }
 
         const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(user._id)
-
+        await createLog(req, {
+            userId: user._id,
+            action: "REFRESH_TOKEN",
+            targetTable: "User",
+            targetId: user._id
+        });
         return res
             .status(200)
             .cookie("accessToken", accessToken, options)
@@ -312,7 +339,10 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 
     //checking password
     const user = await User.findById(req.user?._id)
-    const isPasswordCorrect = await User.isPasswordCorrect(oldPassword)
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
 
     if (!isPasswordCorrect) {
         throw new ApiError(400, "Invalid old password")
@@ -344,6 +374,10 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
     // ✅ 2. Normalize email
     const normalizedEmail = email.toLowerCase().trim();
+
+    if (!normalizedEmail.includes("@")) {
+        throw new ApiError(400, "Invalid email format");
+    }
 
     const user = await User.findOne({ email: normalizedEmail });
 
@@ -430,6 +464,7 @@ const deleteUser = asyncHandler(async (req, res) => {
         role: user.role
     };
 
+    user.isActive = false;
     await user.save({ validateBeforeSave: false });
 
     await createLog(req, {

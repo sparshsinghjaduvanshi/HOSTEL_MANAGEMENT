@@ -4,6 +4,8 @@ import { Staff } from "../models/staff.model.js";
 import { Application } from "../models/application.model.js";
 import { AllotmentCycle } from "../models/allotementCycle.model.js";
 import { Admin } from "../models/admin.model.js";
+import mongoose from "mongoose";
+import { createLog } from "../services/log.service.js";
 
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -49,6 +51,13 @@ const getAllStaff = asyncHandler(async (req, res) => {
     .populate("userId", "fullName email")
     .populate("assignedHostelId");
 
+  await createLog(req, {
+    userId: req.user._id,
+    action: "VIEW",
+    targetTable: "Staff",
+    newData: { type: "ALL_STAFF" }
+  });
+
   return res.status(200).json(
     new ApiResponse(200, staff, "All staff fetched")
   );
@@ -88,6 +97,13 @@ const getAdminDashboard = asyncHandler(async (req, res) => {
     isAllotted: true,
   });
 
+  await createLog(req, {
+    userId: req.user._id,
+    action: "VIEW",
+    targetTable: "Dashboard",
+    newData: { type: "ADMIN_DASHBOARD" }
+  });
+
   return res.status(200).json(
     new ApiResponse(200, {
       totalStudents,
@@ -102,6 +118,9 @@ const getAdminDashboard = asyncHandler(async (req, res) => {
 
 const toggleApplicationWindow = asyncHandler(async (req, res) => {
   const { cycleId, allow } = req.body;
+  if (!cycleId || typeof allow !== "boolean") {
+    throw new ApiError(400, "Invalid input");
+  }
 
   const cycle = await AllotmentCycle.findById(cycleId);
 
@@ -132,7 +151,17 @@ const createStaff = asyncHandler(async (req, res) => {
   session.startTransaction();
 
   try {
-    const { fullName, email, password, phone, role, assignedHostelId, hostelType } = req.body;
+    const { fullName, email, password, phone, role, assignedHostelId } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      throw new ApiError(400, "User already exists");
+    }
+
+    const allowedRoles = ["Cleaner", "Carpenter", "Electrician", "CareTaker", "Warden"];
+    if (!allowedRoles.includes(role)) {
+      throw new ApiError(400, "Invalid staff role");
+    }
 
     // 1. Create User
     const user = await User.create([{
@@ -148,7 +177,6 @@ const createStaff = asyncHandler(async (req, res) => {
       phone,
       role,
       assignedHostelId,
-      hostelType
     }], { session });
 
     await session.commitTransaction();
@@ -233,8 +261,11 @@ const updateStaff = asyncHandler(async (req, res) => {
       action: "UPDATE",
       targetTable: "Staff",
       targetId: staff._id,
-      oldData: { photo: existingStaff?.photo },
-      newData: { photo: staff.photo }
+      oldData,
+      newData: {
+        staff: staff.toObject(),
+        user: user.toObject()
+      }
     });
 
     return res.status(200).json(
@@ -250,6 +281,7 @@ const updateStaff = asyncHandler(async (req, res) => {
 
 const updateStaffPhoto = asyncHandler(async (req, res) => {
   const photoLocalPath = req.file?.path
+  const { id } = req.params;
   if (!photoLocalPath) {
     throw new ApiError(400, "Photo file is missing")
   }
@@ -261,14 +293,14 @@ const updateStaffPhoto = asyncHandler(async (req, res) => {
   }
 
   const staff = await Staff.findByIdAndUpdate(
-    req.staff?._id,
+    id,
     {
       $set: {
         photo: photo.url
       }
     },
     { new: true }
-  ).select("-password")
+  );
 
   return res
     .status(200)
@@ -280,7 +312,7 @@ const updateStaffPhoto = asyncHandler(async (req, res) => {
 const getAllottedStudentsAdmin = asyncHandler(async (req, res) => {
   // 1. Get active or latest completed cycle
   const cycle = await AllotmentCycle.findOne({
-    status: { $in: ["active", "completed"] }
+    status: { $in: ["active", "closed"] }
   }).sort({ createdAt: -1 });
 
   if (!cycle) {

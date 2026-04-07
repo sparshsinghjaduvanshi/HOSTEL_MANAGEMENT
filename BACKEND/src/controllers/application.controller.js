@@ -4,12 +4,16 @@ import { Student } from "../models/student.model.js";
 import { Hostel } from "../models/hostel.model.js";
 import { Document } from "../models/document.model.js";
 import { Staff } from "../models/staff.model.js";
-
-import { calculateDistanceForStudent } from "../utils/distance.util.js";
+import { Allotement } from "../models/allotement.model.js";
+import { sendEmail } from "../utils/sendEmail.js";
+import { createLog } from "../services/log.service.js";
 import { assignRoomToStudent } from "../services/room.service.js";
-
+import { Notification } from "../models/notification.model.js";
+import { calculateDistanceForStudent } from "../utils/distance.util.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
+import { User } from "../models/user.model.js"
+
 
 // 1. Apply for hostels
 
@@ -22,13 +26,12 @@ const applyForHostel = asyncHandler(async (req, res) => {
     applicationOpen: true
   });
 
-
   if (!cycle) {
     throw new ApiError(400, "No active allotment cycle");
   }
 
   //  2. Get student
-  const student = await Student.findById(req.user._id);
+  const student = await Student.findOne({ userId: req.user._id });
   if (!student) {
     throw new ApiError(404, "Student not found");
   }
@@ -46,14 +49,11 @@ const applyForHostel = asyncHandler(async (req, res) => {
   }
 
   //  5. Gender validation
-  const requiredType = student.gender === "male" ? "boys" : "girls";
-
+  const requiredType = student.gender;
   for (let hostel of hostels) {
-    if (hostel.type !== requiredType) {
-      throw new ApiError(
-        400,
-        "Invalid hostel selection: gender mismatch"
-      );
+
+    if (hostel.gender !== requiredType) {
+      throw new ApiError(400, "Invalid hostel selection: gender mismatch");
     }
   }
 
@@ -64,6 +64,12 @@ const applyForHostel = asyncHandler(async (req, res) => {
   });
 
   if (existing) {
+    await createLog(req, {
+      userId: req.user._id,
+      action: "CREATE",
+      targetTable: "Application",
+      newData: { status: "DUPLICATE_ATTEMPT" }
+    });
     throw new ApiError(400, "You have already applied in this cycle");
   }
 
@@ -148,6 +154,10 @@ const startAllotment = asyncHandler(async (req, res) => {
     throw new ApiError(400, "No applications found for this cycle");
   }
 
+  if (!cycle.applicationOpen) {
+    throw new ApiError(400, "Application window closed");
+  }
+
   // Loop through applications
   for (let app of applications) {
 
@@ -155,7 +165,8 @@ const startAllotment = asyncHandler(async (req, res) => {
 
     //  no extra DB call (already populated)
     const student = app.studentId;
-    const requiredType = student.gender === "male" ? "boys" : "girls";
+    const requiredType = student.gender;
+
 
     // Check preferences
     for (let hostelId of app.preferences) {
@@ -164,22 +175,54 @@ const startAllotment = asyncHandler(async (req, res) => {
       if (!hostel) continue;
 
       //  Gender validation
-      if (hostel.type !== requiredType) continue;
+      if (hostel.gender !== requiredType) {
+        throw new ApiError(400, "Invalid hostel selection: gender mismatch");
+      }
 
       //  Seat check
-      if (hostel.availableSeats > 0) {
+      if (hostel.occupiedRooms < hostel.totalRooms) {
         try {
           // 🔥 Assign hostel
           app.allottedHostel = hostel._id;
 
           // Reduce seat
-          hostel.availableSeats -= 1;
+          hostel.occupiedRooms += 1;
 
           await hostel.save();
           await app.save();
 
           // 🔥 Assign room
           await assignRoomToStudent(app);
+
+          const studentDoc = await Student.findById(app.studentId);
+
+          await Notification.create({
+            userId: studentDoc.userId,
+            title: "Hostel Allotted",
+            message: "Your hostel and room have been allotted",
+            type: "allotment"
+          });
+
+          const user = await User.findById(studentDoc.userId);
+
+          await sendEmail({
+            to: user.email,
+            subject: "Hostel Allotment Successful",
+            html: `
+    <h2>Congratulations!</h2>
+    <p>Your hostel has been allotted successfully.</p>
+    <p><b>Hostel:</b> ${hostel.name}</p>
+    <p><b>Room:</b> ${app.roomId}</p>
+  `
+          });
+
+          await Allotement.create({
+            studentId: app.studentId._id || app.studentId,
+            applicationId: app._id,
+            cycleId: cycleId,
+            hostelId: app.allottedHostel,
+            roomNumber: app.roomId
+          });
 
           // ✅ Mark as allotted
           app.isAllotted = true;
@@ -203,7 +246,7 @@ const startAllotment = asyncHandler(async (req, res) => {
   }
 
   // Mark cycle as completed
-  cycle.status = "completed";
+  cycle.status = "closed";
   await cycle.save();
 
   await createLog(req, {
@@ -212,7 +255,7 @@ const startAllotment = asyncHandler(async (req, res) => {
     targetTable: "AllotmentCycle",
     targetId: cycle._id,
     newData: {
-      status: "completed",
+      status: "closed",
       message: "Allotment process executed"
     }
   });
@@ -224,21 +267,18 @@ const startAllotment = asyncHandler(async (req, res) => {
 })
 
 const getApplicationsForWarden = asyncHandler(async (req, res) => {
-  const staffId = req.user._id;
+  if (req.staff.role !== "Warden") {
+    throw new ApiError(403, "Only warden allowed");
+  }
 
-  const staff = await Staff.findById(staffId);
+  const staff = await Staff.findOne({ userId: req.user._id });
 
   if (!staff) {
     throw new ApiError(404, "Staff not found");
   }
 
-  const hostelType = staff.hostelType;
-
-  const hostels = await Hostel.find({ type: hostelType });
-  const hostelIds = hostels.map(h => h._id);
-
   const applications = await Application.find({
-    preferences: { $in: hostelIds },
+    preferences: { $in: [staff.assignedHostelId] },
     "wardenDecision.status": "pending"
   })
     .populate("studentId")
@@ -261,7 +301,11 @@ const getApplicationsForWarden = asyncHandler(async (req, res) => {
 const reviewApplication = asyncHandler(async (req, res) => {
   const { applicationId, action, remarks } = req.body;
 
-  const staffId = req.user._id;
+  if (req.staff.role !== "Warden") {
+    throw new ApiError(403, "Only warden allowed");
+  }
+
+  // const staffId = req.user._id;
 
   if (!["approve", "reject"].includes(action)) {
     throw new ApiError(400, "Invalid action");
@@ -298,6 +342,18 @@ const reviewApplication = asyncHandler(async (req, res) => {
     }
   });
 
+  const studentDoc = await Student.findById(application.studentId);
+  const user = await User.findById(studentDoc.userId);
+
+  sendEmail({
+    to: user.email,
+    subject: "Application Status Update",
+    html: `
+    <h3>Your application is ${application.wardenDecision.status}</h3>
+    <p>${remarks || ""}</p>
+  `
+  });
+
   return res.status(200).json({
     success: true,
     message: `Application ${application.wardenDecision.status} successfully`
@@ -305,9 +361,13 @@ const reviewApplication = asyncHandler(async (req, res) => {
 });
 
 const getMyApplication = asyncHandler(async (req, res) => {
-  const studentId = req.user._id;
-
-  const application = await Application.findOne({ studentId })
+  const student = await Student.findOne({ userId: req.user._id });
+  if (!student) {
+    throw new ApiError(404, "Student not found");
+  }
+  const application = await Application.findOne({
+    studentId: student._id
+  })
     .populate("preferences")
     .populate("allottedHostel")
     .populate("roomId");
@@ -358,26 +418,42 @@ const getAllottedStudents = asyncHandler(async (req, res) => {
 });
 
 const cancelApplication = asyncHandler(async (req, res) => {
-  const studentId = req.user._id;
+  // 🔥 Step 1: get student from user
+  const student = await Student.findOne({ userId: req.user._id });
 
-  const application = await Application.findOne({ studentId });
+  if (!student) {
+    throw new ApiError(404, "Student not found");
+  }
+
+  // 🔥 Step 2: find application using studentId
+  const application = await Application.findOne({
+    studentId: student._id
+  });
 
   if (!application) {
     throw new ApiError(404, "Application not found");
   }
 
+  // ❌ Cannot cancel after allotment
   if (application.isAllotted) {
     throw new ApiError(400, "Cannot cancel after allotment");
   }
 
+  // 🔥 Save old data for logging
+  const oldData = application.toObject();
+
+  // 🗑️ Delete application
   await application.deleteOne();
+
+  // 🔐 Logging
   await createLog(req, {
     userId: req.user._id,
     action: "DELETE",
     targetTable: "Application",
     targetId: application._id,
-    oldData: application
+    oldData
   });
+
   return res.status(200).json({
     success: true,
     message: "Application cancelled successfully"
@@ -398,19 +474,18 @@ const reAllotWaitlisted = asyncHandler(async (req, res) => {
     let allotted = false;
 
     const student = app.studentId;
-    const requiredType = student.gender === "male" ? "boys" : "girls";
-
+    const requiredType = student.gender;
     for (let hostelId of app.preferences) {
       const hostel = await Hostel.findById(hostelId);
 
       if (!hostel) continue;
-      if (hostel.type !== requiredType) continue;
+      if (hostel.gender !== student.gender) continue;
 
-      if (hostel.availableSeats > 0) {
+      if (hostel.occupiedRooms < hostel.totalRooms) {
         try {
           app.allottedHostel = hostel._id;
 
-          hostel.availableSeats -= 1;
+          hostel.occupiedRooms += 1;
           await hostel.save();
 
           await app.save();

@@ -1,10 +1,11 @@
 import { Log } from "../models/log.model.js";
-import asyncHandler from "../utils/asyncHandler.js";
+import {asyncHandler} from "../utils/asyncHandler.js";
+import { createLog } from "../services/log.service.js";
 
 // 1. Get all logs (Admin)
 const getAllLogs = asyncHandler(async (req, res) => {
     const logs = await Log.find()
-        .populate("userId", "name email")
+        .populate("userId", "fullName email")
         .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -18,7 +19,12 @@ const getAllLogs = asyncHandler(async (req, res) => {
 const getMyLogs = asyncHandler(async (req, res) => {
     const logs = await Log.find({ userId: req.user._id })
         .sort({ createdAt: -1 });
-
+    await createLog(req, {
+        userId: req.user._id,
+        action: "VIEW",
+        targetTable: "Log",
+        newData: { type: "MY_LOGS" }
+    });
     res.status(200).json({
         success: true,
         logs,
@@ -28,6 +34,14 @@ const getMyLogs = asyncHandler(async (req, res) => {
 // 3. Filter logs (powerful)
 const filterLogs = asyncHandler(async (req, res) => {
     const { action, userId, startDate, endDate } = req.query;
+
+    if (startDate && isNaN(Date.parse(startDate))) {
+        throw new ApiError(400, "Invalid start date");
+    }
+
+    if (endDate && isNaN(Date.parse(endDate))) {
+        throw new ApiError(400, "Invalid end date");
+    }
 
     let filter = {};
 
@@ -43,6 +57,16 @@ const filterLogs = asyncHandler(async (req, res) => {
     const logs = await Log.find(filter)
         .sort({ createdAt: -1 });
 
+    await createLog(req, {
+        userId: req.user._id,
+        action: "VIEW",
+        targetTable: "Log",
+        newData: {
+            type: "FILTER",
+            filters: { action, userId, startDate, endDate }
+        }
+    });
+
     res.status(200).json({
         success: true,
         logs,
@@ -53,6 +77,10 @@ const filterLogs = asyncHandler(async (req, res) => {
 const deleteLogs = asyncHandler(async (req, res) => {
     const { olderThanDays } = req.query;
     let filter = {};
+
+    if (olderThanDays && isNaN(parseInt(olderThanDays))) {
+        throw new ApiError(400, "Invalid number of days");
+    }
 
     if (olderThanDays) {
         const days = parseInt(olderThanDays);

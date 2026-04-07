@@ -9,7 +9,7 @@ import {
     forgotPassword,
     deleteUser
 } from "../controllers/user.controller.js";
-
+import {sendOTP} from "../controllers/auth.controller.js"
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const userRouter = express.Router();
@@ -20,7 +20,7 @@ userRouter.route("/register").post(registerStudent);
 userRouter.route("/login").post(loginUser);
 userRouter.route("/refresh-token").post(refreshAccessToken);
 userRouter.route("/forgot-password").post(forgotPassword);
-
+router.post("/send-otp", sendOTP);
 
 // PROTECTED ROUTES
 userRouter.route("/logout").post(verifyJWT, logoutUser);

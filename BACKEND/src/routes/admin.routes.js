@@ -44,10 +44,6 @@ adminRouter.delete("/users/:id", verifyJWT, requireAdmin, deleteUser);
 adminRouter.patch("/photo", verifyJWT, requireAdmin, upload.single("photo"), // field name must match frontend
   updateStaffPhoto
 );
-/**
- *  APPLICATIONS
- */
-adminRouter.get("/applications", verifyJWT, requireAdmin, getAllApplicationsAdmin);
 
 /**
  *  SYSTEM CONTROL

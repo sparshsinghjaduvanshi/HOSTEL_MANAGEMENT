@@ -36,11 +36,10 @@ applicationRouter.delete("/cancel", verifyJWT, authorizeRoles("student"), cancel
 
 // ================= WARDEN ROUTES =================
 
-// Get applications to review
-applicationRouter.get("/warden", verifyJWT, authorizeRoles("warden"), getApplicationsForWarden);
+import { requireStaff } from "../middlewares/roles.middleware.js";
 
-// Review application
-applicationRouter.post("/review", verifyJWT, authorizeRoles("warden"), reviewApplication);
+applicationRouter.get("/warden", verifyJWT, requireStaff, getApplicationsForWarden);
+applicationRouter.post("/review", verifyJWT, requireStaff, reviewApplication);
 
 
 // ================= ADMIN ROUTES =================
