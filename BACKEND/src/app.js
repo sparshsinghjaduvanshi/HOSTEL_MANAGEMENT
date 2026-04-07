@@ -1,8 +1,16 @@
+import dotenv from "dotenv";
+dotenv.config();
 import express from "express"
 import cors from "cors"
 import cookieParser from "cookie-parser"
-import dotenv from "dotenv";
-dotenv.config();
+
+
+//Routes Importing
+import userRouter from "./routes/user.routes.js";
+import adminRouter from "./routes/admin.routes.js";
+import applicationRouter from "./routes/application.routes.js";
+import studentRouter from "./routes/student.routes.js";
+import logRouter from "./routes/log.routes.js";
 
 const app = express()
 app.use(cors({
@@ -16,12 +24,6 @@ app.use(express.static("public")) // if we want to store some assets to my serve
 app.use(cookieParser())
 console.log("CORS ORIGIN:", process.env.CORS_ORIGIN);
 
-//Routes Importing
-import userRouter from "./routes/user.routes.js";
-import adminRouter from "./routes/admin.routes.js";
-import applicationRouter from "./routes/application.routes.js";
-import studentRouter from "./routes/student.routes.js";
-import logRouter from "./routes/log.routes.js";
 
 // Routes declaration
 app.use("/api/v1/users", userRouter);
@@ -29,5 +31,12 @@ app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/applications", applicationRouter);
 app.use("/api/v1/students", studentRouter);
 app.use("/api/v1/logs", logRouter);
+console.log("User routes loaded");
+
+console.log("APP IS LOADED");
+
+app.get("/", (req, res) => {
+  res.send("ROOT WORKING");
+});
 
 export { app }

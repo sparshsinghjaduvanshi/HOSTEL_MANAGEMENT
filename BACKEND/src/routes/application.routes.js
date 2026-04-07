@@ -19,7 +19,7 @@ import {
 
 // (Assuming you have auth middleware)
 import { verifyJWT } from "../middlewares/auth.middleware.js";
-import { authorizeRoles } from "../middlewares/role.middleware.js";
+import { authorizeRoles } from "../middlewares/authorizeRoles.js";
 
 
 // ================= STUDENT ROUTES =================

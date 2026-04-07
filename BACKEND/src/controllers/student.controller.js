@@ -4,10 +4,10 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 import { uploadOnCLoudinary } from "../utils/cloudinary.js";
 import { createLog } from "../services/log.service.js";
 
-import { User } from "../models/user.model";
-import { Student } from "../models/student.model";
-import { Document } from "../models/document.model";
-import { RoomChangeRequest } from "../models/roomChangeRequest.model";
+import { User } from "../models/user.model.js";
+import { Student } from "../models/student.model.js";
+import { Document } from "../models/document.model.js";
+import { RoomChangeRequest } from "../models/roomChangeRequest.model.js";
 
 const getMyProfile = asyncHandler(async (req, res) => {
     const user = req.user

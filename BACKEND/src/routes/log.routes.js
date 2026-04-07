@@ -7,7 +7,7 @@ import {
 } from "../controllers/log.controller.js";
 
 import { verifyJWT } from "../middlewares/auth.middleware.js";
-import { isAdmin } from "../middlewares/role.middleware.js";
+import { requireAdmin } from "../middlewares/roles.middleware.js";
 
 const logRouter = express.Router();
 
@@ -16,13 +16,13 @@ const logRouter = express.Router();
  */
 
 // Get all logs
-logRouter.get("/", verifyJWT, isAdmin, getAllLogs);
+logRouter.get("/", verifyJWT, requireAdmin, getAllLogs);
 
 // Filter logs (by action, user, date)
-logRouter.get("/filter", verifyJWT, isAdmin, filterLogs);
+logRouter.get("/filter", verifyJWT, requireAdmin, filterLogs);
 
 // Delete logs (olderThanDays required)
-logRouter.delete("/", verifyJWT, isAdmin, deleteLogs);
+logRouter.delete("/", verifyJWT, requireAdmin, deleteLogs);
 
 
 /**

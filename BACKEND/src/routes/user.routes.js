@@ -20,7 +20,7 @@ userRouter.route("/register").post(registerStudent);
 userRouter.route("/login").post(loginUser);
 userRouter.route("/refresh-token").post(refreshAccessToken);
 userRouter.route("/forgot-password").post(forgotPassword);
-router.post("/send-otp", sendOTP);
+userRouter.post("/send-otp", sendOTP);
 
 // PROTECTED ROUTES
 userRouter.route("/logout").post(verifyJWT, logoutUser);
@@ -30,6 +30,11 @@ userRouter.route("/change-password").post(verifyJWT, changeCurrentPassword);
 
 //  ADMIN / SPECIAL (Protected)
 userRouter.route("/delete/:id").delete(verifyJWT, deleteUser);
+console.log("User router working");
+console.log("USER ROUTES FILE EXECUTED");
 
+userRouter.get("/test", (req, res) => {
+  res.send("User route working");
+});
 
 export default userRouter;

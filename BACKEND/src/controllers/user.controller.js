@@ -3,18 +3,22 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
-import mongoose from "mongoose"
 import { User } from "../models/user.model.js";
 import { Student } from "../models/student.model.js";
 import { Admin } from "../models/admin.model.js";
 import crypto from "crypto"; //built in node.js module used to generate secure random tokens
 import { sendEmail } from "../utils/sendEmail.js";
 import { OTP } from "../models/otp.model.js";
+import { createLog } from "../services/log.service.js";
+
 
 
 const generateAccessAndRefereshTokens = async (userId) => {
     try {
         const user = await User.findById(userId)
+        if (!user) {
+            throw new ApiError(404, "User not found for token generation");
+        }
         const accessToken = user.generateAccessToken()
         const refreshToken = user.generateRefreshToken()
 
@@ -23,22 +27,24 @@ const generateAccessAndRefereshTokens = async (userId) => {
         return { accessToken, refreshToken }
 
     } catch (error) {
+        console.log(error)
         throw new ApiError(400, "Something went wrong while generating the refresh and access token.")
     }
 }
 
-
 const registerStudent = asyncHandler(async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
     try {
-        let { fullName, email, password, phone, enrollmentNo, otp } = req.body;
+        console.log(req.body);
+
+        let { fullName, email, gender, password, phone, enrollmentNo, otp } = req.body;
+
+        // ✅ Fix type issue
+        otp = String(otp);
 
         // 🔥 1. Validate input
         if (
-            [fullName, email, password, phone, enrollmentNo, otp].some(
-                (field) => !field || field.trim() === ""
+            [fullName, email, password, gender, phone, enrollmentNo, otp].some(
+                (field) => !field || String(field).trim() === ""
             )
         ) {
             throw new ApiError(400, "All fields including OTP are required");
@@ -47,6 +53,7 @@ const registerStudent = asyncHandler(async (req, res) => {
         // 🔥 2. Normalize data
         email = email.toLowerCase().trim();
         fullName = fullName.trim();
+        otp = otp.trim();
 
         // 🔥 3. Restrict email domain
         if (!email.endsWith("@curaj.ac.in")) {
@@ -69,50 +76,35 @@ const registerStudent = asyncHandler(async (req, res) => {
         }
 
         // 🔥 5. Check existing user
-        const existedUser = await User.findOne({ email }).session(session);
+        const existedUser = await User.findOne({ email });
         if (existedUser) {
             throw new ApiError(400, "User already exists with this email");
         }
 
         // 🔥 6. Create User
-        const user = await User.create(
-            [
-                {
-                    fullName,
-                    email,
-                    password,
-                    role: "student",
-                },
-            ],
-            { session }
-        );
-
-        const createdUser = user[0];
+        const createdUser = await User.create({
+            fullName,
+            email,
+            password,
+            role: "student",
+        });
 
         if (!createdUser) {
             throw new ApiError(500, "Failed to create user");
         }
 
         // 🔥 7. Create Student
-        await Student.create(
-            [
-                {
-                    userId: createdUser._id,
-                    phone,
-                    enrollmentNo,
-                },
-            ],
-            { session }
-        );
+        await Student.create({
+            userId: createdUser._id,
+            phone,
+            enrollmentNo,
+            gender
+        });
 
         // 🔥 8. Delete OTP after success
         await OTP.deleteMany({ email });
 
-        // 🔥 9. Commit transaction
-        await session.commitTransaction();
-        session.endSession();
-
-        // 🔥 10. Logging
+        // 🔥 9. Logging
         await createLog(req, {
             action: "REGISTER",
             targetTable: "User",
@@ -123,14 +115,12 @@ const registerStudent = asyncHandler(async (req, res) => {
             },
         });
 
-        // 🔥 11. Response
+        // 🔥 10. Response
         return res.status(201).json(
             new ApiResponse(201, createdUser, "Student registered successfully")
         );
 
     } catch (error) {
-        await session.abortTransaction();
-        session.endSession();
         throw error;
     }
 });

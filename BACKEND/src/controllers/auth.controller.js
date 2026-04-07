@@ -1,7 +1,15 @@
 import { OTP } from "../models/otp.model.js";
-
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { sendEmail } from "../utils/sendEmail.js";
 
 const sendOTP = asyncHandler(async (req, res) => {
+
+  
+  console.log("SEND OTP HIT"); 
+
+
   let { email } = req.body;
 
   if (!email) {
@@ -10,17 +18,17 @@ const sendOTP = asyncHandler(async (req, res) => {
 
   email = email.toLowerCase().trim();
 
-  // 🔒 Restrict to college email
+  //  Restrict to college email
   if (!email.endsWith("@curaj.ac.in")) {
     throw new ApiError(400, "Use your college email");
   }
 
-  // 🔥 Generate OTP
+  //  Generate OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-  // 🔥 Save OTP (delete old ones first)
+  //  Save OTP (delete old ones first)
   await OTP.deleteMany({ email });
-
+ console.log("otp sent is : -------- ",otp)
   await OTP.create({
     email,
     otp,
