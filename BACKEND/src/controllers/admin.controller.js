@@ -2,10 +2,10 @@ import { User } from "../models/user.model.js";
 import { Student } from "../models/student.model.js";
 import { Staff } from "../models/staff.model.js";
 import { Application } from "../models/application.model.js";
-import { AllotmentCycle } from "../models/allotmentCycle.model.js";
+import { AllotmentCycle } from "../models/allotementCycle.model.js";
 import { Admin } from "../models/admin.model.js";
 
-import asyncHandler from "../utils/asyncHandler.js";
+import {asyncHandler} from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { uploadOnCLoudinary } from "../utils/cloudinary.js";

@@ -1,5 +1,5 @@
 import { Application } from "../models/application.model.js";
-import { AllotmentCycle } from "../models/allotmentCycle.model.js";
+import { AllotmentCycle } from "../models/allotementCycle.model.js";
 import { Student } from "../models/student.model.js";
 import { Hostel } from "../models/hostel.model.js";
 import { Document } from "../models/document.model.js";
@@ -431,5 +431,6 @@ export {
   getAllottedStudents,
   cancelApplication,
   reAllotWaitlisted,
-  getDashboardStats
+  getDashboardStats,
+  
 } 

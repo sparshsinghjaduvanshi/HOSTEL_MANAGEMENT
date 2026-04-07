@@ -14,7 +14,8 @@ import {
 import { deleteUser } from "../controllers/user.controller.js";
 
 import { verifyJWT } from "../middlewares/auth.middleware.js";
-import requireAdmin  from "../middlewares/roles.middleware.js"
+import {requireAdmin } from "../middlewares/roles.middleware.js"
+import {upload} from "../middlewares/multer.middleware.js"
 
 const adminRouter = express.Router();
 
@@ -58,7 +59,7 @@ import {
   reviewApplication,
   startAllotment,
   reAllotWaitlisted,
-  getAllottedStudentsAdmin
+  getAllottedStudents
 } from "../controllers/application.controller.js";
 
 /**
@@ -78,8 +79,7 @@ adminRouter.post("/allotment/start", verifyJWT, requireAdmin, startAllotment);
 adminRouter.post("/allotment/reallot", verifyJWT, requireAdmin, reAllotWaitlisted);
 
 // View allotted students
-adminRouter.get("/allotment/allotted", verifyJWT, requireAdmin, getAllottedStudentsAdmin
-);
+adminRouter.get("/allotment/allotted", verifyJWT, requireAdmin, getAllottedStudents);
 
 
 export default adminRouter;
