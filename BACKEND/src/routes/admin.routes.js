@@ -16,42 +16,42 @@ import { deleteUser } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import requireAdmin  from "../middlewares/roles.middleware.js"
 
-const router = express.Router();
+const adminRouter = express.Router();
 
 /**
  *  ADMIN PROFILE
  */
-router.get("/me", verifyJWT, requireAdmin, getAdminProfile);
+adminRouter.get("/me", verifyJWT, requireAdmin, getAdminProfile);
 
 /**
  *  DASHBOARD
  */
-router.get("/dashboard", verifyJWT, requireAdmin, getAdminDashboard);
+adminRouter.get("/dashboard", verifyJWT, requireAdmin, getAdminDashboard);
 
 /**
  *  STUDENTS
  */
-router.get("/students", verifyJWT, requireAdmin, getAllStudentsAdmin);
+adminRouter.get("/students", verifyJWT, requireAdmin, getAllStudentsAdmin);
 
 /**
  *  STAFF MANAGEMENT
  */
-router.get("/staff", verifyJWT, requireAdmin, getAllStaff);
-router.post("/staff", verifyJWT, requireAdmin, createStaff);
-router.put("/staff/:id", verifyJWT, requireAdmin, updateStaff);
-router.delete("/users/:id", verifyJWT, requireAdmin, deleteUser);
-router.patch("/photo", verifyJWT, requireAdmin, upload.single("photo"), // field name must match frontend
+adminRouter.get("/staff", verifyJWT, requireAdmin, getAllStaff);
+adminRouter.post("/staff", verifyJWT, requireAdmin, createStaff);
+adminRouter.put("/staff/:id", verifyJWT, requireAdmin, updateStaff);
+adminRouter.delete("/users/:id", verifyJWT, requireAdmin, deleteUser);
+adminRouter.patch("/photo", verifyJWT, requireAdmin, upload.single("photo"), // field name must match frontend
   updateStaffPhoto
 );
 /**
  *  APPLICATIONS
  */
-router.get("/applications", verifyJWT, requireAdmin, getAllApplicationsAdmin);
+adminRouter.get("/applications", verifyJWT, requireAdmin, getAllApplicationsAdmin);
 
 /**
  *  SYSTEM CONTROL
  */
-router.post("/application-window", verifyJWT, requireAdmin, toggleApplicationWindow);
+adminRouter.post("/application-window", verifyJWT, requireAdmin, toggleApplicationWindow);
 
 import {
   getAllApplications,
@@ -66,20 +66,20 @@ import {
  */
 
 // View all applications
-router.get("/applications", verifyJWT, requireAdmin, getAllApplications);
+adminRouter.get("/applications", verifyJWT, requireAdmin, getAllApplications);
 
 // Approve / Reject application
-router.post("/applications/review", verifyJWT, requireAdmin, reviewApplication);
+adminRouter.post("/applications/review", verifyJWT, requireAdmin, reviewApplication);
 
 // Start allotment process
-router.post("/allotment/start", verifyJWT, requireAdmin, startAllotment);
+adminRouter.post("/allotment/start", verifyJWT, requireAdmin, startAllotment);
 
 // Re-allot waitlisted students
-router.post("/allotment/reallot", verifyJWT, requireAdmin, reAllotWaitlisted);
+adminRouter.post("/allotment/reallot", verifyJWT, requireAdmin, reAllotWaitlisted);
 
 // View allotted students
-router.get("/allotment/allotted", verifyJWT, requireAdmin, getAllottedStudentsAdmin
+adminRouter.get("/allotment/allotted", verifyJWT, requireAdmin, getAllottedStudentsAdmin
 );
 
 
-export default router;
+export default adminRouter;

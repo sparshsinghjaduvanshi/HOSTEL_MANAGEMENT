@@ -1,11 +1,11 @@
-import { asyncHandler } from "../utils/asyncHandler"
-import { ApiError } from '../utils/ApiError'
-import { ApiResponse } from "../utils/ApiResponse"
+import { asyncHandler } from "../utils/asyncHandler.js"
+import { ApiError } from '../utils/ApiError.js'
+import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose"
-import { User } from "../models/user.model";
-import { Student } from "../models/student.model";
-import { Admin } from "../models/admin.model";
+import { User } from "../models/user.model.js";
+import { Student } from "../models/student.model.js";
+import { Admin } from "../models/admin.model.js";
 import crypto from "crypto"; //built in node.js module used to generate secure random tokens
 import { sendEmail } from "../utils/sendEmail.js";
 

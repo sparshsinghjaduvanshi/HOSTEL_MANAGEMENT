@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { studentRouter } from "express";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
@@ -11,25 +11,25 @@ import {
   getMyRoomChangeRequests
 } from "../controllers/student.controller.js";
 
-const router = Router();
+const studentRouter = Router();
 
 //  All routes are protected
-router.use(verifyJWT);
+studentRouter.use(verifyJWT);
 
 
 // ================= PROFILE =================
 
 // Get profile
-router.get("/profile", getMyProfile);
+studentRouter.get("/profile", getMyProfile);
 
 // Update profile
-router.patch("/profile", updateProfile);
+studentRouter.patch("/profile", updateProfile);
 
 
 // ================= DOCUMENT =================
 
 // Upload document (PDF only)
-router.post(
+studentRouter.post(
   "/documents",
   upload.single("file"), // field name must match frontend
   uploadDocument
@@ -39,13 +39,13 @@ router.post(
 // ================= ROOM CHANGE =================
 
 // Create request (swap / single)
-router.post("/room-change", createRoomChangeRequest);
+studentRouter.post("/room-change", createRoomChangeRequest);
 
 // Respond to swap request
-router.patch("/room-change/:id/respond", respondToRoomChange);
+studentRouter.patch("/room-change/:id/respond", respondToRoomChange);
 
 // Get all my requests
-router.get("/room-change", getMyRoomChangeRequests);
+studentRouter.get("/room-change", getMyRoomChangeRequests);
 
 
-export default router;
+export default studentRouter;

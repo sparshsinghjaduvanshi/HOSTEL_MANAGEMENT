@@ -1,41 +1,48 @@
-const BASE_URL = "http://localhost:5000/api/users";
+import axios from "axios";
 
-// REGISTER
+// Create Axios instance
+const API = axios.create({
+  baseURL: "http://localhost:5000/api/v1/users", // adjust if your route is different
+  withCredentials: true, // IMPORTANT (for cookies: accessToken, refreshToken)
+});
+
+// =====================
+// 🔐 AUTH APIs
+// =====================
+
+// Register Student
 export const registerUser = async (data) => {
-  const response = await fetch(`${BASE_URL}/register`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include", // same as withCredentials: true
-    body: JSON.stringify(data),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.message || "Registration failed");
-  }
-
-  return result;
+  return await API.post("/register", data);
 };
 
-// LOGIN
+// Login User
 export const loginUser = async (data) => {
-  const response = await fetch(`${BASE_URL}/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include",
-    body: JSON.stringify(data),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.message || "Login failed");
-  }
-
-  return result;
+  return await API.post("/login", data);
 };
+
+// Logout User
+export const logoutUser = async () => {
+  return await API.post("/logout");
+};
+
+// Get Current User
+export const getCurrentUser = async () => {
+  return await API.get("/me");
+};
+
+// Refresh Token
+export const refreshToken = async () => {
+  return await API.post("/refresh-token");
+};
+
+// Change Password
+export const changePassword = async (data) => {
+  return await API.post("/change-password", data);
+};
+
+// Forgot Password
+export const forgotPassword = async (email) => {
+  return await API.post("/forgot-password", { email });
+};
+
+export default API;

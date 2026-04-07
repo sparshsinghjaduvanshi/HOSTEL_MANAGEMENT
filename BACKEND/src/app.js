@@ -16,10 +16,11 @@ app.use(express.static("public")) // if we want to store some assets to my serve
 app.use(cookieParser())
 
 //Importing Routes
-import userRoutes from "./routes/user.routes"
-
+import userRouter from "./routes/user.routes.js"
+import adminRouter from "./routes/admin.routes.js"
 
 //Routes declaration
-app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/users", userRouter);
+app.use("/api/v1/admin", adminRouter);
 
 export { app }
