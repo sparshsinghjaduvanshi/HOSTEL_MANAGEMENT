@@ -12,7 +12,7 @@ const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path="/" element={<Layout />}>
       <Route index element={<Auth />} />   {/* default route */}
-      {/* <Route path="/auth" element={<Auth />} /> */}
+      <Route path="/auth" element={<Auth />} />
     </Route>
   )
 )

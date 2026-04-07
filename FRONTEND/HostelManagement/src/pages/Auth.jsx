@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { loginUser, registerUser } from "../services/authServices.js";
+import { useNavigate } from "react-router-dom";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -31,9 +33,16 @@ const Auth = () => {
 
         console.log("Login Success:", res.data);
 
-        // 👉 next step (we'll add later)
-        // redirect based on role
-      } else {
+        const user = res.data.data.user;
+
+        // 🔥 Role-based redirect
+        if (user.role === "admin") {
+          navigate("/admin/dashboard");
+        } else if (user.role === "student") {
+          navigate("/student/dashboard"); // future
+        }
+      }
+      else {
         const res = await registerUser(formData);
 
         console.log("Register Success:", res.data);
@@ -41,6 +50,7 @@ const Auth = () => {
         // 👉 optional: auto switch to login
         setIsLogin(true);
       }
+      console.log("FULL RESPONSE:", res.data);
     } catch (error) {
       console.error(
         error.response?.data?.message || error.message
@@ -50,9 +60,9 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      
+
       <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-        
+
         {/* Title */}
         <h2 className="text-2xl font-bold text-center mb-6">
           {isLogin ? "Login" : "Register"}

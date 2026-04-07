@@ -1,15 +1,17 @@
-import { useState } from 'react'
-import './App.css'
-import Auth from "./pages/Auth.jsx"
-function App() {
-  const [count, setCount] = useState(0)
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Auth from "./pages/Auth";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 
+function App() {
   return (
-    <>
-      <Auth/>
-      <h1>Hello world</h1>
-    </>
-  )
+    <Router>
+      <Routes>
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        
+      </Routes>
+    </Router>
+  );
 }
 
-export default App
+export default App;

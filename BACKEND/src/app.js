@@ -14,7 +14,7 @@ app.use(express.json({ limit: "16kb"}))
 app.use(express.urlencoded({ extended: true, limit: "16kb" }))
 app.use(express.static("public")) // if we want to store some assets to my server i can use this to save in folder public
 app.use(cookieParser())
-
+console.log("CORS ORIGIN:", process.env.CORS_ORIGIN);
 //Importing Routes
 import userRouter from "./routes/user.routes.js"
 import adminRouter from "./routes/admin.routes.js"

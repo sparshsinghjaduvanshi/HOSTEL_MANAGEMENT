@@ -102,6 +102,19 @@ const applyForHostel = asyncHandler(async (req, res) => {
     preferences,
     priorityScore
   });
+  //logging
+  await createLog(req, {
+    userId: req.user._id,
+    action: "CREATE",
+    targetTable: "Application",
+    targetId: application._id,
+    newData: {
+      preferences,
+      cycleId: cycle._id,
+      distance,
+      priorityScore
+    }
+  });
 
   //  11. Response
   return res.status(201).json({
@@ -193,6 +206,17 @@ const startAllotment = asyncHandler(async (req, res) => {
   cycle.status = "completed";
   await cycle.save();
 
+  await createLog(req, {
+    userId: req.user._id,
+    action: "UPDATE",
+    targetTable: "AllotmentCycle",
+    targetId: cycle._id,
+    newData: {
+      status: "completed",
+      message: "Allotment process executed"
+    }
+  });
+
   return res.status(200).json({
     success: true,
     message: "Hostel and room allotment completed successfully"
@@ -220,6 +244,13 @@ const getApplicationsForWarden = asyncHandler(async (req, res) => {
     .populate("studentId")
     .populate("preferences")
     .sort({ createdAt: -1 });
+
+  await createLog(req, {
+    userId: req.user._id,
+    action: "VIEW",
+    targetTable: "Application",
+    newData: { type: "WARDEN_PENDING_APPLICATIONS" }
+  });
 
   return res.status(200).json({
     success: true,
@@ -256,6 +287,17 @@ const reviewApplication = asyncHandler(async (req, res) => {
 
   await application.save();
 
+  await createLog(req, {
+    userId: req.user._id,
+    action: action === "approve" ? "APPROVE" : "REJECT",
+    targetTable: "Application",
+    targetId: application._id,
+    newData: {
+      status: application.wardenDecision.status,
+      remarks
+    }
+  });
+
   return res.status(200).json({
     success: true,
     message: `Application ${application.wardenDecision.status} successfully`
@@ -287,6 +329,13 @@ const getAllApplications = asyncHandler(async (req, res) => {
     .populate("allottedHostel")
     .populate("roomId")
     .sort({ createdAt: -1 });
+
+  await createLog(req, {
+    userId: req.user._id,
+    action: "VIEW",
+    targetTable: "Application",
+    newData: { type: "ALL_APPLICATIONS_ADMIN" }
+  });
 
   return res.status(200).json({
     success: true,
@@ -322,7 +371,13 @@ const cancelApplication = asyncHandler(async (req, res) => {
   }
 
   await application.deleteOne();
-
+  await createLog(req, {
+    userId: req.user._id,
+    action: "DELETE",
+    targetTable: "Application",
+    targetId: application._id,
+    oldData: application
+  });
   return res.status(200).json({
     success: true,
     message: "Application cancelled successfully"
@@ -379,6 +434,16 @@ const reAllotWaitlisted = asyncHandler(async (req, res) => {
     if (!allotted) continue;
   }
 
+  await createLog(req, {
+    userId: req.user._id,
+    action: "UPDATE",
+    targetTable: "Application",
+    newData: {
+      type: "REALLOTMENT",
+      cycleId
+    }
+  });
+
   return res.status(200).json({
     success: true,
     message: "Re-allotment completed"
@@ -432,5 +497,5 @@ export {
   cancelApplication,
   reAllotWaitlisted,
   getDashboardStats,
-  
+
 } 

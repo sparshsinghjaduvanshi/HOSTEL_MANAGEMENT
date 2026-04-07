@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Create Axios instance
 const API = axios.create({
-  baseURL: "http://localhost:5000/api/v1/users", // adjust if your route is different
+  baseURL: "http://localhost:8000/api/v1/users", // adjust if your route is different
   withCredentials: true, // IMPORTANT (for cookies: accessToken, refreshToken)
 });
 

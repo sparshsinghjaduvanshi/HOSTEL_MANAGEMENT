@@ -60,7 +60,20 @@ const deleteLogs = asyncHandler(async (req, res) => {
         filter.createdAt = { $lt: date };
     }
 
+    // 🔹 Count before delete (for logging)
+    const logsToDelete = await Log.countDocuments(filter);
+
     const result = await Log.deleteMany(filter);
+
+    // 🔐 Logging
+    await createLog(req, {
+        userId: req.user?._id,
+        action: "DELETE",
+        targetTable: "Log",
+        oldData: { deletedCount: logsToDelete, filter },
+        newData: { deletedCount: result.deletedCount }
+    });
+
     res.status(200).json({
         success: true,
         message: "Logs deleted successfully",

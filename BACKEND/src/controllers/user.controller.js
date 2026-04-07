@@ -31,29 +31,44 @@ const registerStudent = asyncHandler(async (req, res) => {
     session.startTransaction();
 
     try {
-        let { fullName, email, password, phone, enrollmentNo } = req.body;
+        let { fullName, email, password, phone, enrollmentNo, otp } = req.body;
 
-        //  1. Basic validation
-        if ([fullName, email, password, phone, enrollmentNo].some(f => f?.trim() === "")) {
-            throw new ApiError(400, "All fields are required");
+        // ✅ 1. Validation
+        if ([fullName, email, password, phone, enrollmentNo, otp].some(f => !f || f.trim() === "")) {
+            throw new ApiError(400, "All fields including OTP are required");
         }
 
-        // ✅ 2. Normalize data
+        // ✅ 2. Normalize
         email = email.toLowerCase().trim();
         fullName = fullName.trim();
 
-        // ✅ 3. Restrict to college email
+        // ✅ 3. Email restriction
         if (!email.endsWith("@curaj.ac.in")) {
             throw new ApiError(400, "Use your college email");
         }
 
-        // ✅ 4. Check existing user
+        // ✅ 4. Verify OTP
+        const otpRecord = await OTP.findOne({ email }).sort({ createdAt: -1 });
+
+        if (!otpRecord) {
+            throw new ApiError(400, "OTP not found");
+        }
+
+        if (otpRecord.otp !== otp) {
+            throw new ApiError(400, "Invalid OTP");
+        }
+
+        if (otpRecord.expiresAt < new Date()) {
+            throw new ApiError(400, "OTP expired");
+        }
+
+        // ✅ 5. Check existing user (inside transaction)
         const existedUser = await User.findOne({ email }).session(session);
         if (existedUser) {
             throw new ApiError(400, "User already exists with this email");
         }
 
-        // ✅ 5. Create User (force role)
+        // ✅ 6. Create User
         const user = await User.create([{
             fullName,
             email,
@@ -63,24 +78,38 @@ const registerStudent = asyncHandler(async (req, res) => {
 
         const createdUser = user[0];
 
-        // Checking if user is created or not
         if (!createdUser) {
-            throw new ApiError(500, "Something went wrong while registering the user")
+            throw new ApiError(500, "Failed to create user");
         }
 
-        // ✅ 6. Create Student
+        // ✅ 7. Create Student
         await Student.create([{
             userId: createdUser._id,
             phone,
             enrollmentNo
         }], { session });
 
-        // ✅ 7. Commit transaction
+        // ✅ 8. Delete OTP after successful verification
+        await OTP.deleteMany({ email });
+
+        // ✅ 9. Commit transaction
         await session.commitTransaction();
         session.endSession();
 
-        return res.status(201)
-            .json(new ApiResponse(201, createdUser, "Student registered successfully"));
+        // ✅ 10. Logging (outside transaction)
+        await createLog(req, {
+            action: "REGISTER",
+            targetTable: "User",
+            targetId: createdUser._id,
+            newData: {
+                email: createdUser.email,
+                role: createdUser.role
+            }
+        });
+
+        return res.status(201).json(
+            new ApiResponse(201, createdUser, "Student registered successfully")
+        );
 
     } catch (error) {
         await session.abortTransaction();
@@ -105,13 +134,31 @@ const loginUser = asyncHandler(async (req, res) => {
 
     //checking if user existed or not
     if (!user) {
+
+        await createLog(req, {
+            action: "LOGIN",
+            targetTable: "User",
+            newData: {
+                email: normalizedEmail,
+                status: "FAILED_USER_NOT_FOUND"
+            }
+        });
         throw new ApiError(404, "User does not exist")
     }
-
     const isPasswordValid = await user.isPasswordCorrect(password)
 
     //check if password is working or not
     if (!isPasswordValid) {
+
+        await createLog(req, {
+            action: "LOGIN",
+            targetTable: "User",
+            targetId: user._id,
+            newData: {
+                status: "FAILED_WRONG_PASSWORD"
+            }
+        });
+
         throw new ApiError(401, "Invalid user credentials")
     }
 
@@ -128,6 +175,13 @@ const loginUser = asyncHandler(async (req, res) => {
         httpOnly: true,
         secure: true
     }
+
+    await createLog(req, {
+        userId: user._id,
+        action: "LOGIN",
+        targetTable: "User",
+        targetId: user._id
+    });
 
     return res
         .status(200)
@@ -162,6 +216,13 @@ const logoutUser = asyncHandler(async (req, res) => {
         httpOnly: true,
         secure: true
     }
+
+    await createLog(req, {
+        userId: req.user._id,
+        action: "LOGOUT",
+        targetTable: "User",
+        targetId: req.user._id
+    });
 
     return res
         .status(200)
@@ -235,7 +296,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             .json(
                 new ApiResponse(
                     200,
-                    { accessToken, refreshToken},
+                    { accessToken, refreshToken },
                     "Access token refreshed"
                 )
             )
@@ -260,51 +321,95 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
     user.password = newPassword
     await user.save({ validateBeforeSave: false })
 
+    await createLog(req, {
+        userId: req.user._id,
+        action: "UPDATE",
+        targetTable: "User",
+        targetId: req.user._id,
+        newData: { type: "PASSWORD_CHANGED" }
+    });
+
     return res
         .status(200)
         .json(new ApiResponse(200, {}, "Password changed successfully"))
 })
 
 const forgotPassword = asyncHandler(async (req, res) => {
-    //getting the inputs
-    const { email } = req.body
-    if (!email) {
+    let { email } = req.body;
+
+    // ✅ 1. Validate input
+    if (!email || email.trim() === "") {
         throw new ApiError(400, "Email is required");
     }
 
+    // ✅ 2. Normalize email
     const normalizedEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: normalizedEmail })
+
+    const user = await User.findOne({ email: normalizedEmail });
+
+    // ✅ 3. Always return same response (prevent user enumeration)
     if (!user) {
-        return res.status(200)
-            .json(new ApiResponse(200, {}, "If this email existes, a reset link has been sent"))
+        return res.status(200).json(
+            new ApiResponse(200, {}, "If this email exists, a reset link has been sent")
+        );
     }
-    //generate token
+
+    // ✅ 4. Generate reset token
     const resetToken = crypto.randomBytes(32).toString("hex");
+
     const hashedToken = crypto
         .createHash("sha256")
         .update(resetToken)
         .digest("hex");
 
+    // ✅ 5. Save hashed token in DB
     user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpiry = Date.now() + 10 * 60 * 1000;
+    user.resetPasswordExpiry = Date.now() + 10 * 60 * 1000; // 10 min
 
     await user.save({ validateBeforeSave: false });
-    const resetUrl = `http://localhost:${process.env.PORT}/reset-password/${resetToken}`;
 
-    //send email
-    await sendEmail({
-        to: user.email,
-        subject: "Password Reset Tequest",
-        text: `Reset you password using this link: ${resetUrl}`,
-        html: `
-        <h2>Password Reset</h2>
-        <p>Click below to reset your password:</p>
-            <a href="${resetUrl}">${resetUrl}</a>`
-    })
-    return res.status(200).json(
-        new ApiResponse(200, {}, "Reset link sent to email")
-    );
-})
+    // ✅ 6. FIXED reset URL (IMPORTANT)
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+    // ❌ Don't use backend localhost URL
+
+    try {
+        // ✅ 7. Send email
+        await sendEmail({
+            to: user.email,
+            subject: "Password Reset Request",
+            text: `Reset your password using this link: ${resetUrl}`,
+            html: `
+                <h2>Password Reset</h2>
+                <p>Click below to reset your password:</p>
+                <a href="${resetUrl}">${resetUrl}</a>
+                <p>This link will expire in 10 minutes.</p>
+            `
+        });
+
+        // ✅ 8. Logging
+        await createLog(req, {
+            action: "UPDATE",
+            targetTable: "User",
+            targetId: user._id,
+            newData: {
+                email: normalizedEmail,
+                type: "PASSWORD_RESET_REQUEST"
+            }
+        });
+
+        return res.status(200).json(
+            new ApiResponse(200, {}, "Reset link sent to email")
+        );
+
+    } catch (error) {
+        // ✅ 9. Cleanup if email fails (VERY IMPORTANT)
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpiry = undefined;
+        await user.save({ validateBeforeSave: false });
+
+        throw new ApiError(500, "Email could not be sent");
+    }
+});
 
 const deleteUser = asyncHandler(async (req, res) => {
     const { id } = req.params
@@ -319,7 +424,22 @@ const deleteUser = asyncHandler(async (req, res) => {
 
     // ✅ soft delete
     user.isActive = false;
+
+    const oldData = {
+        isActive: user.isActive,
+        role: user.role
+    };
+
     await user.save({ validateBeforeSave: false });
+
+    await createLog(req, {
+        userId: req.user._id,
+        action: "DELETE",
+        targetTable: "User",
+        targetId: user._id,
+        oldData,
+        newData: { isActive: false }
+    });
 
     return res.status(200).json(
         new ApiResponse(200, {}, "User deactivated successfully")

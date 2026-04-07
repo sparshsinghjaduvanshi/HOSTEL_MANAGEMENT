@@ -5,7 +5,7 @@ import { Application } from "../models/application.model.js";
 import { AllotmentCycle } from "../models/allotementCycle.model.js";
 import { Admin } from "../models/admin.model.js";
 
-import {asyncHandler} from "../utils/asyncHandler.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { uploadOnCLoudinary } from "../utils/cloudinary.js";
@@ -18,6 +18,13 @@ const getAdminProfile = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Not an admin");
   }
 
+  await createLog(req, {
+    userId: req.user._id,
+    action: "VIEW",
+    targetTable: "Admin",
+    targetId: admin._id
+  });
+
   return res.status(200).json(
     new ApiResponse(200, admin, "Admin profile fetched")
   );
@@ -26,7 +33,12 @@ const getAdminProfile = asyncHandler(async (req, res) => {
 const getAllStudentsAdmin = asyncHandler(async (req, res) => {
   const students = await Student.find()
     .populate("userId", "fullName email");
-
+  await createLog(req, {
+    userId: req.user._id,
+    action: "VIEW",
+    targetTable: "Student",
+    newData: { type: "ALL_STUDENTS" }
+  });
   return res.status(200).json(
     new ApiResponse(200, students, "All students fetched")
   );
@@ -48,7 +60,12 @@ const getAllApplicationsAdmin = asyncHandler(async (req, res) => {
     .populate("preferences")
     .populate("allottedHostel")
     .sort({ createdAt: -1 });
-
+  await createLog(req, {
+    userId: req.user._id,
+    action: "VIEW",
+    targetTable: "Application",
+    newData: { type: "ALL_APPLICATIONS" }
+  });
   return res.status(200).json(
     new ApiResponse(200, applications, "All applications fetched")
   );
@@ -95,6 +112,15 @@ const toggleApplicationWindow = asyncHandler(async (req, res) => {
   cycle.applicationOpen = allow;
   await cycle.save();
 
+  await createLog(req, {
+    userId: req.user._id,
+    action: "UPDATE",
+    targetTable: "AllotmentCycle",
+    targetId: cycle._id,
+    oldData: { applicationOpen: !allow },
+    newData: { applicationOpen: allow }
+  });
+
   return res.status(200).json({
     success: true,
     message: `Application window ${allow ? "opened" : "closed"}`
@@ -127,6 +153,17 @@ const createStaff = asyncHandler(async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    await createLog(req, {
+      userId: req.user._id,
+      action: "CREATE",
+      targetTable: "Staff",
+      targetId: staff[0]._id,
+      newData: {
+        staff: staff[0],
+        user: user[0]
+      }
+    });
 
     return res.status(201).json({
       success: true,
@@ -196,8 +233,8 @@ const updateStaff = asyncHandler(async (req, res) => {
       action: "UPDATE",
       targetTable: "Staff",
       targetId: staff._id,
-      oldData,
-      newData: { staff, user }
+      oldData: { photo: existingStaff?.photo },
+      newData: { photo: staff.photo }
     });
 
     return res.status(200).json(

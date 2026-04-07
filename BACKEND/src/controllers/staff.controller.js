@@ -85,6 +85,18 @@ const updateComplaintStatus = asyncHandler(async (req, res) => {
 
   await complaint.save();
 
+  await createLog(req, {
+    userId: req.user?._id,
+    action: "UPDATE",
+    targetTable: "Maintenance",
+    targetId: complaint._id,
+    oldData: { status: oldStatus },
+    newData: {
+      status: complaint.status,
+      handledBy: staff._id
+    }
+  });
+
   return res.status(200).json({
     success: true,
     message: "Status updated",
@@ -144,6 +156,15 @@ const decideRoomChange = asyncHandler(async (req, res) => {
   if (action === "reject") {
     request.status = "rejected";
     await request.save();
+
+    await createLog(req, {
+      userId: req.user._id,
+      action: "REJECT",
+      targetTable: "RoomChangeRequest",
+      targetId: request._id,
+      newData: { status: "rejected" }
+    });
+
     return res.json({ success: true, request });
   }
 
@@ -161,45 +182,76 @@ const decideRoomChange = asyncHandler(async (req, res) => {
     appA.roomId = appB.roomId;
     appB.roomId = temp;
 
+    const oldData = {
+      studentA: appA.roomId,
+      studentB: appB.roomId
+    };
+
     await appA.save();
     await appB.save();
+
+    await createLog(req, {
+      userId: req.user._id,
+      action: "UPDATE",
+      targetTable: "Room",
+      newData: {
+        type: "SWAP",
+        studentA: appA.studentId,
+        studentB: appB.studentId,
+        newRoomA: appA.roomId,
+        newRoomB: appB.roomId
+      },
+      oldData
+    });
+
   }
 
   //  SINGLE CASE
   if (request.type === "single") {
-  if (!newRoomId) {
-    throw new ApiError(400, "Room ID required");
+    if (!newRoomId) {
+      throw new ApiError(400, "Room ID required");
+    }
+
+    const app = await Application.findOne({
+      studentId: request.requester,
+      isAllotted: true
+    });
+
+    if (!app) {
+      throw new ApiError(404, "Application not found");
+    }
+
+    const room = await Room.findById(newRoomId);
+
+    if (!room) {
+      throw new ApiError(404, "Room not found");
+    }
+
+    // Same hostel check
+    if (room.hostelId.toString() !== app.allottedHostel.toString()) {
+      throw new ApiError(400, "Room must belong to same hostel");
+    }
+
+    // Vacancy check
+    if (room.occupiedCount >= room.capacity) {
+      throw new ApiError(400, "Room is full");
+    }
+
+    const oldRoom = app.roomId;
+
+    //  Assign room
+    app.roomId = newRoomId;
+    await app.save();
+
+    await createLog(req, {
+      userId: req.user._id,
+      action: "UPDATE",
+      targetTable: "Room",
+      targetId: app._id,
+      oldData: { roomId: oldRoom },
+      newData: { roomId: newRoomId }
+    });
   }
-
-  const app = await Application.findOne({
-    studentId: request.requester,
-    isAllotted: true
-  });
-
-  if (!app) {
-    throw new ApiError(404, "Application not found");
-  }
-
-  const room = await Room.findById(newRoomId);
-
-  if (!room) {
-    throw new ApiError(404, "Room not found");
-  }
-
-  // Same hostel check
-  if (room.hostelId.toString() !== app.allottedHostel.toString()) {
-    throw new ApiError(400, "Room must belong to same hostel");
-  }
-
-  // Vacancy check
-  if (room.occupiedCount >= room.capacity) {
-    throw new ApiError(400, "Room is full");
-  }
-
-  //  Assign room
-  app.roomId = newRoomId;
-  await app.save();
-}
 });
 
 

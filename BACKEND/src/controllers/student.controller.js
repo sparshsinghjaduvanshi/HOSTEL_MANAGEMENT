@@ -43,30 +43,40 @@ const getMyProfile = asyncHandler(async (req, res) => {
 })
 
 const updateProfile = asyncHandler(async (req, res) => {
-  const { fullName, enrollmentNo, phone } = req.body;
+    const { fullName, enrollmentNo, phone } = req.body;
 
-  // 1. Build update object dynamically
-  const updateFields = {};
+    // 1. Build update object dynamically
+    const updateFields = {};
 
-  if (fullName) updateFields.fullName = fullName;
-  if (enrollmentNo) updateFields.enrollmentNo = enrollmentNo;
-  if (phone) updateFields.phone = phone;
+    if (fullName) updateFields.fullName = fullName;
+    if (enrollmentNo) updateFields.enrollmentNo = enrollmentNo;
+    if (phone) updateFields.phone = phone;
 
-  // 2. Check if nothing to update
-  if (Object.keys(updateFields).length === 0) {
-    throw new ApiError(400, "At least one field is required to update");
-  }
+    // 2. Check if nothing to update
+    if (Object.keys(updateFields).length === 0) {
+        throw new ApiError(400, "At least one field is required to update");
+    }
+    const oldStudent = await Student.findById(req.student?._id);
 
-  // 3. Update
-  const student = await Student.findByIdAndUpdate(
-    req.student?._id,
-    { $set: updateFields },
-    { new: true, runValidators: true }
-  );
+    // 3. Update
+    const student = await Student.findByIdAndUpdate(
+        req.student?._id,
+        { $set: updateFields },
+        { new: true, runValidators: true }
+    );
 
-  return res.status(200).json(
-    new ApiResponse(200, student, "Account details updated successfully")
-  );
+    await createLog(req, {
+        userId: req.user._id,
+        action: "UPDATE_PROFILE",
+        targetTable: "Student",
+        targetId: student._id,
+        oldData: oldStudent,
+        newData: student
+    });
+
+    return res.status(200).json(
+        new ApiResponse(200, student, "Account details updated successfully")
+    );
 });
 
 const uploadDocument = asyncHandler(async (req, res) => {
@@ -105,7 +115,7 @@ const uploadDocument = asyncHandler(async (req, res) => {
     if (req.file.mimetype !== "application/pdf") {
         throw new ApiError(400, "Only PDF allowed");
     }
-    
+
     const existingDoc = await Document.findOne({
         studentId: student._id,
         type
@@ -133,6 +143,17 @@ const uploadDocument = asyncHandler(async (req, res) => {
 
     const document = await Document.create(documentData);
 
+    await createLog(req, {
+        userId: req.user._id,
+        action: "CREATE",
+        targetTable: "Document",
+        targetId: document._id,
+        newData: {
+            type: document.type,
+            applicationId: document.applicationId || null
+        }
+    });
+
     return res.status(201).json(
         new ApiResponse(201, document, "Document uploaded successfully")
     );
@@ -154,6 +175,17 @@ const createRoomChangeRequest = asyncHandler(async (req, res) => {
         targetStudent: targetStudentId || null,
         type,
         reason
+    });
+
+    await createLog(req, {
+        userId: req.user._id,
+        action: "CREATE",
+        targetTable: "RoomChangeRequest",
+        targetId: request._id,
+        newData: {
+            type: request.type,
+            targetStudent: request.targetStudent || null
+        }
     });
 
     return res.status(201).json({
@@ -181,6 +213,16 @@ const respondToRoomChange = asyncHandler(async (req, res) => {
 
     request.targetApproved = true;
     await request.save();
+
+    await createLog(req, {
+        userId: req.user._id,
+        action: "UPDATE",
+        targetTable: "RoomChangeRequest",
+        targetId: request._id,
+        newData: {
+            targetApproved: true
+        }
+    });
 
     return res.status(200).json({
         success: true,
