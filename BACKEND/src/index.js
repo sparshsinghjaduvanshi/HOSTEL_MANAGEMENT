@@ -1,21 +1,30 @@
-import dotenv from 'dotenv';
-dotenv.config({
-    path: './.env'
-});
+import dotenv from "dotenv";
+import mongoose from "mongoose";
+import {app} from "./app.js";
+import "./cron/reallotment.cron.js";
 
-import connectDB from "./db/index.js";
-import { app } from "./app.js";
+// Load environment variables
+dotenv.config();
 
-connectDB()
-.then(()=>{
-    app.on('error',(error)=>{
-        console.log("error in connecting to the server",error);
-        throw error;
-    })
-    app.listen(process.env.PORT || 8000, () =>{
-        console.log(`server is running on port ${process.env.PORT}`);
-    })
-})
-.catch((error)=>{
-    console.log("error in connecting to the database",error);
-})
+// Port
+const PORT = process.env.PORT || 5000;
+
+// MongoDB Connection
+const connectDB = async () => {
+  try {
+    const conn = await mongoose.connect(process.env.MONGODB_URI);
+
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+
+    // Start server ONLY after DB connects
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+
+  } catch (error) {
+    console.error("❌ Database connection failed:", error.message);
+    process.exit(1);
+  }
+};
+
+connectDB();

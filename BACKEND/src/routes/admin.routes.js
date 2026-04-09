@@ -5,77 +5,70 @@ import {
   getAllStudentsAdmin,
   getAllStaff,
   getAllApplicationsAdmin,
+  getActiveCycle,
   getAdminDashboard,
   toggleApplicationWindow,
   createStaff,
   updateStaff,
-  updateStaffPhoto
+  updateStaffPhoto,
+  forceCloseCycle
 } from "../controllers/admin.controller.js";
-import { deleteUser } from "../controllers/user.controller.js";
-
-import { verifyJWT } from "../middlewares/auth.middleware.js";
-import {requireAdmin } from "../middlewares/roles.middleware.js"
-import {upload} from "../middlewares/multer.middleware.js"
-
-const adminRouter = express.Router();
-
-/**
- *  ADMIN PROFILE
- */
-adminRouter.get("/me", verifyJWT, requireAdmin, getAdminProfile);
-
-/**
- *  DASHBOARD
- */
-adminRouter.get("/dashboard", verifyJWT, requireAdmin, getAdminDashboard);
-
-/**
- *  STUDENTS
- */
-adminRouter.get("/students", verifyJWT, requireAdmin, getAllStudentsAdmin);
-
-/**
- *  STAFF MANAGEMENT
- */
-adminRouter.get("/staff", verifyJWT, requireAdmin, getAllStaff);
-adminRouter.post("/staff", verifyJWT, requireAdmin, createStaff);
-adminRouter.put("/staff/:id", verifyJWT, requireAdmin, updateStaff);
-adminRouter.delete("/users/:id", verifyJWT, requireAdmin, deleteUser);
-adminRouter.patch("/photo", verifyJWT, requireAdmin, upload.single("photo"), // field name must match frontend
-  updateStaffPhoto
-);
-
-/**
- *  SYSTEM CONTROL
- */
-adminRouter.post("/application-window", verifyJWT, requireAdmin, toggleApplicationWindow);
 
 import {
-  getAllApplications,
   reviewApplication,
   startAllotment,
   reAllotWaitlisted,
-  getAllottedStudents
+  getAllottedStudents,
+  runAllotment
 } from "../controllers/application.controller.js";
 
+import { deleteUser } from "../controllers/user.controller.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { requireAdmin } from "../middlewares/roles.middleware.js";
+import { upload } from "../middlewares/multer.middleware.js";
+
+const adminRouter = express.Router();
+
+adminRouter.get("/cycle/active", getActiveCycle);
+
+// 🔒 Apply middleware ONCE
+adminRouter.use(verifyJWT, requireAdmin);
+
 /**
- *  APPLICATION MANAGEMENT (ADMIN)
+ * PROFILE + DASHBOARD
  */
+adminRouter.get("/me", getAdminProfile);
+adminRouter.get("/dashboard", getAdminDashboard);
 
-// View all applications
-adminRouter.get("/applications", verifyJWT, requireAdmin, getAllApplications);
+/**
+ * STUDENTS + STAFF
+ */
+adminRouter.get("/students", getAllStudentsAdmin);
 
-// Approve / Reject application
-adminRouter.post("/applications/review", verifyJWT, requireAdmin, reviewApplication);
+adminRouter.get("/staff", getAllStaff);
+adminRouter.post("/staff", createStaff);
+adminRouter.put("/staff/:id", updateStaff);
+adminRouter.delete("/users/:id", deleteUser);
+adminRouter.patch("/photo", upload.single("photo"), updateStaffPhoto);
 
-// Start allotment process
-adminRouter.post("/allotment/start", verifyJWT, requireAdmin, startAllotment);
+/**
+ * APPLICATION MANAGEMENT
+ */
+adminRouter.get("/applications", getAllApplicationsAdmin);
+adminRouter.post("/applications/review", reviewApplication);
 
-// Re-allot waitlisted students
-adminRouter.post("/allotment/reallot", verifyJWT, requireAdmin, reAllotWaitlisted);
+/**
+ * ALLOTMENT
+ */
+adminRouter.post("/allotment/start", startAllotment);
+adminRouter.post("/allotment/run", runAllotment);
+adminRouter.post("/allotment/reallot", reAllotWaitlisted);
+adminRouter.get("/allotment/allotted", getAllottedStudents);
 
-// View allotted students
-adminRouter.get("/allotment/allotted", verifyJWT, requireAdmin, getAllottedStudents);
-
+/**
+ * CYCLE CONTROL (🔥 IMPORTANT)
+ */
+adminRouter.patch("/cycle/toggle-application", toggleApplicationWindow);
+adminRouter.patch("/cycle/force-close", forceCloseCycle);
 
 export default adminRouter;

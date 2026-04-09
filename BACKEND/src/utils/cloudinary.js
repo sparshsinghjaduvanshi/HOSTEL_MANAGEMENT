@@ -6,7 +6,7 @@ const { v2: cloudinaryV2 } = cloudinary;
 cloudinaryV2.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET       
+    api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
 const uploadOnCLoudinary = async (localFilePath) => {
@@ -17,11 +17,15 @@ const uploadOnCLoudinary = async (localFilePath) => {
             resource_type: "auto"
         });
 
-        fs.unlinkSync(localFilePath);
+        if (fs.existsSync(localFilePath)) {
+            fs.unlinkSync(localFilePath);
+        }
         return response;
 
     } catch (error) {
-        fs.unlinkSync(localFilePath);
+        if (fs.existsSync(localFilePath)) {
+            fs.unlinkSync(localFilePath);
+        }
         return null;
     }
 };

@@ -240,37 +240,44 @@ const logoutUser = asyncHandler(async (req, res) => {
 
 const getCurrentUser = asyncHandler(async (req, res) => {
     const user = req.user;
+
     if (!user) {
-        throw new ApiError(400, "Error fetching user data")
+        throw new ApiError(400, "Error fetching user data");
     }
 
     let roleData = null;
-    //fetching role based data
+
     if (user.role === "student") {
-        roleData = await Student.findOne({ userId: user._id })
+        roleData = await Student.findOne({ userId: user._id });
     }
+
     if (user.role === "admin") {
-        roleData = await Admin.findOne({ userId: user._id })
+        roleData = await Admin.findOne({ userId: user._id });
     }
-    //for staff too
+
+    // 🔥 DO NOT THROW ERROR HERE
     if (!roleData) {
-        throw new ApiError(404, "Role data not found");
+        console.log("⚠️ Role data not found for user:", user._id);
     }
+
     await createLog(req, {
         userId: user._id,
         action: "VIEW",
         targetTable: "User",
         newData: { type: "CURRENT_USER" }
     });
-    return res
-        .status(200)
-        .json(new ApiResponse(200, {
-            user,
-            roleData
-        },
-            "User fetched successfully."))
 
-})
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            {
+                user,
+                roleData: roleData || null // ✅ IMPORTANT
+            },
+            "User fetched successfully."
+        )
+    );
+});
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
     const incomingRefreshToken = req.cookies?.refreshToken || req.body.refreshToken

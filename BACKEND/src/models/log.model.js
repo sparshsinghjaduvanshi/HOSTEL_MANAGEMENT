@@ -18,6 +18,7 @@ const logSchema = new Schema(
         "CREATE",
         "UPDATE",
         "DELETE",
+        "VIEW"
       ],
     },
 

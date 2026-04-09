@@ -98,11 +98,12 @@ applicationSchema.index(
 );
 
 // ✅ Remove duplicate preferences
-applicationSchema.pre("save", function (next) {
-  if (this.preferences) {
-    this.preferences = [...new Set(this.preferences.map(id => id.toString()))];
+applicationSchema.pre("save", function () {
+  if (this.preferences && Array.isArray(this.preferences)) {
+    this.preferences = [
+      ...new Set(this.preferences.map(id => id.toString()))
+    ];
   }
-  next();
 });
 
 export const Application = mongoose.model("Application", applicationSchema);

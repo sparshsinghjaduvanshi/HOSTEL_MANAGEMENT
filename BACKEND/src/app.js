@@ -11,6 +11,9 @@ import adminRouter from "./routes/admin.routes.js";
 import applicationRouter from "./routes/application.routes.js";
 import studentRouter from "./routes/student.routes.js";
 import logRouter from "./routes/log.routes.js";
+import hostelRoutes from "./routes/hostel.routes.js";
+import notificationRouter from "./routes/notification.routes.js";
+
 
 const app = express()
 app.use(cors({
@@ -31,6 +34,8 @@ app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/applications", applicationRouter);
 app.use("/api/v1/students", studentRouter);
 app.use("/api/v1/logs", logRouter);
+app.use("/api/v1/hostels", hostelRoutes);
+app.use("/api/v1/notifications", notificationRouter);
 console.log("User routes loaded");
 
 console.log("APP IS LOADED");

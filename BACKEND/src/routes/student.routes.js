@@ -6,9 +6,11 @@ import {
   getMyProfile,
   updateProfile,
   uploadDocument,
+  getDocuments,
   createRoomChangeRequest,
   respondToRoomChange,
-  getMyRoomChangeRequests
+  getMyRoomChangeRequests,
+  cancelRoomChange
 } from "../controllers/student.controller.js";
 
 const studentRouter = Router();
@@ -31,9 +33,10 @@ studentRouter.patch("/profile", updateProfile);
 // Upload document (PDF only)
 studentRouter.post(
   "/documents",
-  upload.single("file"), // field name must match frontend
+  upload.array("files", 3), // max 3 files, // field name must match frontend
   uploadDocument
 );
+studentRouter.get("/documents", getDocuments);
 
 
 // ================= ROOM CHANGE =================
@@ -46,6 +49,8 @@ studentRouter.patch("/room-change/:id/respond", respondToRoomChange);
 
 // Get all my requests
 studentRouter.get("/room-change", getMyRoomChangeRequests);
+
+studentRouter.delete("/room-change/:id", cancelRoomChange);
 
 
 export default studentRouter;

@@ -1,4 +1,4 @@
-import mongoose, {Schema} from "mongoose"
+import mongoose, { Schema } from "mongoose"
 
 const roomChangeSchema = new Schema(
   {
@@ -46,6 +46,7 @@ const roomChangeSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "User"
     },
+  
 
     decidedAt: Date
   },

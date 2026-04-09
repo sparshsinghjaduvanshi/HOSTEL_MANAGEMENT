@@ -14,6 +14,12 @@ const allotmentCycleSchema = new Schema(
       required: true
       // Example: "2025-2026"
     },
+    reAllotmentOpen: {
+      type: Boolean,
+      default: false
+    },
+    reAllotmentStartDate: Date,
+    reAllotmentEndDate: Date,
 
     startDate: {
       type: Date,
@@ -27,7 +33,7 @@ const allotmentCycleSchema = new Schema(
 
     status: {
       type: String,
-      enum: ["upcoming", "active", "closed"],
+      enum: ["upcoming", "open", "closed"],
       default: "upcoming",
       index: true
     },
@@ -40,7 +46,11 @@ const allotmentCycleSchema = new Schema(
     applicationOpen: {
       type: Boolean,
       default: false
-    }
+    },
+    cycleNumber: {
+      type: Number,
+      required: true
+    },
 
   },
   { timestamps: true }
@@ -49,7 +59,6 @@ const allotmentCycleSchema = new Schema(
 // 🚀 Prevent duplicate cycles like "Round 1 - 2025"
 allotmentCycleSchema.index(
   { name: 1, academicYear: 1 },
-  { unique: true }
 );
 
 export const AllotmentCycle = mongoose.model(

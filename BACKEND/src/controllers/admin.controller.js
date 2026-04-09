@@ -116,35 +116,6 @@ const getAdminDashboard = asyncHandler(async (req, res) => {
   );
 });
 
-const toggleApplicationWindow = asyncHandler(async (req, res) => {
-  const { cycleId, allow } = req.body;
-  if (!cycleId || typeof allow !== "boolean") {
-    throw new ApiError(400, "Invalid input");
-  }
-
-  const cycle = await AllotmentCycle.findById(cycleId);
-
-  if (!cycle) {
-    throw new ApiError(404, "Cycle not found");
-  }
-
-  cycle.applicationOpen = allow;
-  await cycle.save();
-
-  await createLog(req, {
-    userId: req.user._id,
-    action: "UPDATE",
-    targetTable: "AllotmentCycle",
-    targetId: cycle._id,
-    oldData: { applicationOpen: !allow },
-    newData: { applicationOpen: allow }
-  });
-
-  return res.status(200).json({
-    success: true,
-    message: `Application window ${allow ? "opened" : "closed"}`
-  });
-});
 
 const createStaff = asyncHandler(async (req, res) => {
   const session = await mongoose.startSession();
@@ -344,6 +315,136 @@ const getAllottedStudentsAdmin = asyncHandler(async (req, res) => {
   );
 });
 
+const createCycle = asyncHandler(async (req, res) => {
+
+  const academicYear = getAcademicYear();
+
+  // 🔥 prevent duplicate
+  const existing = await AllotmentCycle.findOne({ academicYear });
+
+  if (existing) {
+    throw new ApiError(400, "Cycle already exists for this year");
+  }
+
+  const cycle = await AllotmentCycle.create({
+    name: `Cycle ${academicYear}`,
+    academicYear,
+    status: "active",
+    applicationOpen: true,  // 🔥 OPEN for students
+    startDate: new Date(),
+    endDate: new Date(
+      Date.now() + 180 * 24 * 60 * 60 * 1000
+    )
+  });
+
+  return res.status(201).json({
+    success: true,
+    message: "Cycle created. Students can now apply.",
+    data: cycle
+  });
+});
+
+const closeApplicationWindow = asyncHandler(async (req, res) => {
+
+  const cycle = await AllotmentCycle.findOne({
+    status: "active"
+  }).sort({ createdAt: -1 });
+
+  if (!cycle) {
+    throw new ApiError(404, "No active cycle found");
+  }
+
+  if (!cycle.applicationOpen) {
+    throw new ApiError(400, "Application already closed");
+  }
+
+  cycle.applicationOpen = false;
+
+  await cycle.save();
+
+  return res.status(200).json({
+    success: true,
+    message: "Application window closed"
+  });
+});
+
+const closeCycle = asyncHandler(async (req, res) => {
+
+  const cycle = await AllotmentCycle.findOne({
+    status: "active"
+  });
+
+  if (!cycle) {
+    throw new ApiError(404, "No active cycle");
+  }
+
+  cycle.status = "closed";
+  cycle.applicationOpen = false;
+
+  await cycle.save();
+
+  return res.status(200).json({
+    success: true,
+    message: "Cycle closed"
+  });
+});
+
+// 🔥 GET ACTIVE CYCLE
+const getActiveCycle = asyncHandler(async (req, res) => {
+  const cycle = await AllotmentCycle.findOne({
+    status: "open"
+  }).sort({ createdAt: -1 });
+
+  return res.status(200).json({
+    success: true,
+    data: cycle || null
+  });
+});
+
+// 🔥 TOGGLE APPLICATION WINDOW
+const toggleApplicationWindow = asyncHandler(async (req, res) => {
+  const cycle = await AllotmentCycle.findOne({ status: "open" });
+
+  if (!cycle) {
+    throw new ApiError(404, "No active cycle found");
+  }
+
+  cycle.applicationOpen = !cycle.applicationOpen;
+  await cycle.save();
+  await Student.updateMany(
+    {},
+    { $set: { isDocumentUploadAllowed: cycle.applicationOpen } }
+  );
+
+  return res.status(200).json({
+    success: true,
+    applicationOpen: cycle.applicationOpen,
+    message: cycle.applicationOpen
+      ? "Applications opened"
+      : "Applications closed"
+  });
+});
+
+// 🔥 FORCE CLOSE (STOP EVERYTHING)
+const forceCloseCycle = asyncHandler(async (req, res) => {
+  const cycle = await AllotmentCycle.findOne({ status: "open" });
+
+  if (!cycle) {
+    throw new ApiError(404, "No active cycle found");
+  }
+
+  cycle.status = "closed";
+  cycle.applicationOpen = false;
+  cycle.reAllotmentOpen = false;
+
+  await cycle.save();
+
+  return res.status(200).json({
+    success: true,
+    message: "Cycle forcefully closed"
+  });
+});
+
 export {
   getAdminProfile,
   getAllStudentsAdmin,
@@ -354,5 +455,10 @@ export {
   createStaff,
   updateStaff,
   updateStaffPhoto,
-  getAllottedStudentsAdmin
+  getAllottedStudentsAdmin,
+  getActiveCycle,
+  forceCloseCycle,
+  createCycle,
+  closeApplicationWindow,
+  closeCycle
 };

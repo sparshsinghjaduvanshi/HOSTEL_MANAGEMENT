@@ -13,6 +13,7 @@ import { calculateDistanceForStudent } from "../utils/distance.util.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js"
+import { getAcademicYear } from "../utils/academicYear.js";
 
 
 // 1. Apply for hostels
@@ -22,12 +23,15 @@ const applyForHostel = asyncHandler(async (req, res) => {
 
   //  1. Get active cycle
   const cycle = await AllotmentCycle.findOne({
-    status: "active",
+    status: "open",
     applicationOpen: true
   });
 
   if (!cycle) {
-    throw new ApiError(400, "No active allotment cycle");
+    throw new ApiError(
+      400,
+      "Applications are currently closed. Please wait for admin to start a new cycle."
+    );
   }
 
   //  2. Get student
@@ -88,13 +92,17 @@ const applyForHostel = asyncHandler(async (req, res) => {
   }
 
   //  8. Calculate distance (NEW CLEAN APPROACH)
-  let distance;
+  let distance = 0; // default fallback
 
   try {
-    distance = await calculateDistanceForStudent(student._id);
-    distance = Math.round(distance);
+    const calculated = await calculateDistanceForStudent(student._id);
+
+    if (calculated !== null && calculated !== undefined) {
+      distance = Math.round(calculated);
+    }
+
   } catch (err) {
-    throw new ApiError(400, err.message);
+    console.log("Distance calculation failed, continuing...", err.message);
   }
 
   //  9. Priority logic
@@ -132,139 +140,118 @@ const applyForHostel = asyncHandler(async (req, res) => {
 
 // 2. Start allotment (Admin)
 const startAllotment = asyncHandler(async (req, res) => {
-  const { cycleId } = req.body;
 
-  //  Validate cycle
-  const cycle = await AllotmentCycle.findById(cycleId);
+  const academicYear = getAcademicYear();
+  console.log("🔥 START ALLOTMENT HIT");
+
+  // 🔥 prevent multiple active cycles
+  const activeCycle = await AllotmentCycle.findOne({
+    status: "open"
+  });
+  console.log("ACTIVE CYCLE:", activeCycle);
+
+  if (activeCycle) {
+    throw new ApiError(400, "Another cycle is already active");
+  }
+
+  // 🔥 find last cycle
+  const lastCycle = await AllotmentCycle.findOne({ academicYear })
+    .sort({ cycleNumber: -1 });
+
+  const nextCycleNumber = lastCycle?.cycleNumber
+    ? lastCycle.cycleNumber + 1
+    : 1;
+
+ const count = await AllotmentCycle.countDocuments({ academicYear });
+
+const cycleNumber = count + 1;
+
+const cycle = await AllotmentCycle.create({
+  name: `Cycle ${academicYear} - ${cycleNumber}`,
+  academicYear,
+  cycleNumber,
+  status: "open",
+  applicationOpen: true,
+  startDate: new Date(),
+  endDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
+});
+
+  return res.status(201).json({
+    success: true,
+    message: "Cycle started. Students can now apply.",
+    data: cycle
+  });
+});
+
+const runAllotment = asyncHandler(async (req, res) => {
+
+  const cycle = await AllotmentCycle.findOne({
+    status: "open"
+  });
 
   if (!cycle) {
-    throw new ApiError(404, "Allotment cycle not found");
+    throw new ApiError(404, "No active cycle found");
   }
 
-  //  Get all applications sorted by priority
+  if (cycle.status !== "open") {
+    throw new ApiError(400, "Cycle is not active");
+  }
+
+  // ❗ ensure applications are closed
+  if (cycle.applicationOpen) {
+    throw new ApiError(
+      400,
+      "Close application window before running allotment"
+    );
+  }
+
   const applications = await Application.find({
-    cycleId,
-    "wardenDecision.status": "approved", // ✅ only approved
-    isAllotted: false
+    cycleId: cycle._id,
+    "wardenDecision.status": "approved",
+    isAllotted: false,
   })
-    .sort({ priorityScore: -1 })
-    .populate("studentId"); //  optimization
+    .populate("preferences")
+    .sort({ priorityScore: -1 });
 
-  if (applications.length === 0) {
-    throw new ApiError(400, "No applications found for this cycle");
-  }
+  for (const app of applications) {
+    let allocated = false;
 
-  if (!cycle.applicationOpen) {
-    throw new ApiError(400, "Application window closed");
-  }
+    for (const hostelId of app.preferences) {
+      const room = await Room.findOne({
+        hostelId,
+        $expr: { $lt: ["$occupiedCount", "$capacity"] }
+      });
 
-  // Loop through applications
-  for (let app of applications) {
+      if (room) {
+        room.occupiedCount += 1;
+        await room.save();
 
-    let allotted = false;
+        app.isAllotted = true;
+        app.allottedHostel = hostelId;
+        app.roomId = room._id;
+        app.allocationStatus = "allotted";
+        await app.save();
 
-    //  no extra DB call (already populated)
-    const student = app.studentId;
-    const requiredType = student.gender;
-
-
-    // Check preferences
-    for (let hostelId of app.preferences) {
-      const hostel = await Hostel.findById(hostelId);
-
-      if (!hostel) continue;
-
-      //  Gender validation
-      if (hostel.gender !== requiredType) {
-        throw new ApiError(400, "Invalid hostel selection: gender mismatch");
-      }
-
-      //  Seat check
-      if (hostel.occupiedRooms < hostel.totalRooms) {
-        try {
-          // 🔥 Assign hostel
-          app.allottedHostel = hostel._id;
-
-          // Reduce seat
-          hostel.occupiedRooms += 1;
-
-          await hostel.save();
-          await app.save();
-
-          // 🔥 Assign room
-          await assignRoomToStudent(app);
-
-          const studentDoc = await Student.findById(app.studentId);
-
-          await Notification.create({
-            userId: studentDoc.userId,
-            title: "Hostel Allotted",
-            message: "Your hostel and room have been allotted",
-            type: "allotment"
-          });
-
-          const user = await User.findById(studentDoc.userId);
-
-          await sendEmail({
-            to: user.email,
-            subject: "Hostel Allotment Successful",
-            html: `
-    <h2>Congratulations!</h2>
-    <p>Your hostel has been allotted successfully.</p>
-    <p><b>Hostel:</b> ${hostel.name}</p>
-    <p><b>Room:</b> ${app.roomId}</p>
-  `
-          });
-
-          await Allotement.create({
-            studentId: app.studentId._id || app.studentId,
-            applicationId: app._id,
-            cycleId: cycleId,
-            hostelId: app.allottedHostel,
-            roomNumber: app.roomId
-          });
-
-          // ✅ Mark as allotted
-          app.isAllotted = true;
-          await app.save();
-
-          allotted = true;
-          break;
-
-        } catch (err) {
-          // Room allocation failed → try next hostel
-          continue;
-        }
+        allocated = true;
+        break;
       }
     }
 
-    //  DO NOT reject here (important design choice)
-    if (!allotted) {
+    if (!allocated) {
       app.allocationStatus = "waitlisted";
       await app.save();
     }
   }
 
-  // Mark cycle as completed
+  // 🔥 CLOSE CYCLE
   cycle.status = "closed";
   await cycle.save();
 
-  await createLog(req, {
-    userId: req.user._id,
-    action: "UPDATE",
-    targetTable: "AllotmentCycle",
-    targetId: cycle._id,
-    newData: {
-      status: "closed",
-      message: "Allotment process executed"
-    }
-  });
-
   return res.status(200).json({
     success: true,
-    message: "Hostel and room allotment completed successfully"
+    message: "Allotment completed"
   });
-})
+});
 
 const getApplicationsForWarden = asyncHandler(async (req, res) => {
   if (req.staff.role !== "Warden") {
@@ -461,67 +448,67 @@ const cancelApplication = asyncHandler(async (req, res) => {
 });
 
 const reAllotWaitlisted = asyncHandler(async (req, res) => {
-  const { cycleId } = req.body;
 
-  const applications = await Application.find({
-    cycleId,
-    allocationStatus: "waitlisted"
-  })
-    .sort({ priorityScore: -1 })
-    .populate("studentId");
+  // 🔥 Get last CLOSED cycle
+  const cycle = await AllotmentCycle.findOne({
+    status: "closed"
+  }).sort({ createdAt: -1 });
 
-  for (let app of applications) {
-    let allotted = false;
-
-    const student = app.studentId;
-    const requiredType = student.gender;
-    for (let hostelId of app.preferences) {
-      const hostel = await Hostel.findById(hostelId);
-
-      if (!hostel) continue;
-      if (hostel.gender !== student.gender) continue;
-
-      if (hostel.occupiedRooms < hostel.totalRooms) {
-        try {
-          app.allottedHostel = hostel._id;
-
-          hostel.occupiedRooms += 1;
-          await hostel.save();
-
-          await app.save();
-
-          await assignRoomToStudent(app);
-
-          app.isAllotted = true;
-          app.allocationStatus = "allotted";
-
-          await app.save();
-
-          allotted = true;
-          break;
-
-        } catch (err) {
-          continue;
-        }
-      }
-    }
-
-    if (!allotted) continue;
+  if (!cycle) {
+    throw new ApiError(404, "No completed cycle found");
   }
 
-  await createLog(req, {
-    userId: req.user._id,
-    action: "UPDATE",
-    targetTable: "Application",
-    newData: {
-      type: "REALLOTMENT",
-      cycleId
+  if (cycle.reAllotmentOpen) {
+    throw new ApiError(400, "Re-allotment already active");
+  }
+
+  // 🔥 Open re-allot window
+  const now = new Date();
+
+  cycle.reAllotmentOpen = true;
+  cycle.reAllotmentStartDate = now;
+  cycle.reAllotmentEndDate = new Date(
+    now.getTime() + 15 * 24 * 60 * 60 * 1000
+  );
+
+  await cycle.save();
+
+  // 🔥 Only waitlisted from THIS cycle
+  const applications = await Application.find({
+    cycleId: cycle._id,
+    allocationStatus: "waitlisted"
+  }).populate("studentId");
+
+  for (const app of applications) {
+    let allocated = false;
+
+    for (const hostelId of app.preferences) {
+      const room = await Room.findOne({
+        hostelId,
+        $expr: { $lt: ["$occupiedCount", "$capacity"] }
+      });
+
+      if (room) {
+        room.occupiedCount += 1;
+        await room.save();
+
+        app.isAllotted = true;
+        app.allottedHostel = hostelId;
+        app.roomId = room._id;
+        app.allocationStatus = "allotted";
+        await app.save();
+
+        allocated = true;
+        break;
+      }
     }
-  });
+  }
 
   return res.status(200).json({
     success: true,
-    message: "Re-allotment completed"
+    message: "Re-allotment started for 15 days",
+    cycleId: cycle._id,
+    endsAt: cycle.reAllotmentEndDate
   });
 });
 
@@ -572,5 +559,6 @@ export {
   cancelApplication,
   reAllotWaitlisted,
   getDashboardStats,
+  runAllotment
 
 } 
