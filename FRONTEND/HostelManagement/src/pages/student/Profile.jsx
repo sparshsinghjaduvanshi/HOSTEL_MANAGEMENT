@@ -11,12 +11,13 @@ const Profile = () => {
 
   const fetchProfile = async () => {
     const res = await getProfile();
-    setData(res.data.data);
+    const d = res.data.data;
 
+    setData(d);
     setForm({
-      fullName: res.data.data.user.fullName,
-      phone: res.data.data.student.phone,
-      enrollmentNo: res.data.data.student.enrollmentId
+      fullName: d.user.fullName,
+      phone: d.student.phone,
+      enrollmentNo: d.student.enrollmentId
     });
   };
 
@@ -25,13 +26,9 @@ const Profile = () => {
   }, []);
 
   const handleUpdate = async () => {
-    try {
-      await updateProfile(form);
-      alert("Updated!");
-      fetchProfile();
-    } catch (err) {
-      alert(err.response?.data?.message);
-    }
+    await updateProfile(form);
+    alert("Updated!");
+    fetchProfile();
   };
 
   if (!data) return <p>Loading...</p>;
@@ -42,35 +39,19 @@ const Profile = () => {
 
       <div className="bg-white p-6 rounded-xl shadow space-y-4">
 
-        <input
-          value={form.fullName}
-          onChange={(e) =>
-            setForm({ ...form, fullName: e.target.value })
-          }
-          className="input"
-        />
+        <input value={form.fullName}
+          onChange={e => setForm({ ...form, fullName: e.target.value })}
+          className="input" placeholder="Name" />
 
-        <input
-          value={form.phone}
-          onChange={(e) =>
-            setForm({ ...form, phone: e.target.value })
-          }
-          className="input"
-        />
+        <input value={data.user.email} disabled className="input bg-gray-100" />
 
-        <input
-          value={form.enrollmentNo}
-          onChange={(e) =>
-            setForm({ ...form, enrollmentNo: e.target.value })
-          }
-          className="input"
-        />
+        <input value={form.phone}
+          onChange={e => setForm({ ...form, phone: e.target.value })}
+          className="input" placeholder="Phone" />
 
-        <button
-          onClick={handleUpdate}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          Update Profile
+        <button onClick={handleUpdate}
+          className="bg-blue-600 text-white px-4 py-2 rounded">
+          Update
         </button>
 
       </div>

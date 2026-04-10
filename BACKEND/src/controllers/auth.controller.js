@@ -1,38 +1,60 @@
+import validator from "validator";
 import { OTP } from "../models/otp.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { sendEmail } from "../utils/sendEmail.js";
 
+
+// ================= HELPERS =================
+
+const sanitize = (val) => {
+  if (typeof val !== "string") return "";
+  return validator.escape(val.trim());
+};
+
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+
+// ================= SEND OTP =================
+
 const sendOTP = asyncHandler(async (req, res) => {
-
-  
-  console.log("SEND OTP HIT"); 
-
-
   let { email } = req.body;
 
-  if (!email) {
-    throw new ApiError(400, "Email is required");
+  //  Sanitize
+  email = sanitize(email).toLowerCase();
+
+  //  Validate email
+  if (!validator.isEmail(email)) {
+    throw new ApiError(400, "Invalid email format");
   }
 
-  email = email.toLowerCase().trim();
-
-  //  Restrict to college email
+  //  Restrict domain
   if (!email.endsWith("@curaj.ac.in")) {
     throw new ApiError(400, "Use your college email");
   }
 
-  //  Generate OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  //  Prevent spam (cooldown)
+  const recentOTP = await OTP.findOne({ email: { $eq: email } })
+    .sort({ createdAt: -1 });
 
-  //  Save OTP (delete old ones first)
-  await OTP.deleteMany({ email });
- console.log("otp sent is : -------- ",otp)
+  if (recentOTP && Date.now() - new Date(recentOTP.createdAt).getTime() < 60 * 1000) {
+    throw new ApiError(429, "Wait 1 minute before requesting OTP again");
+  }
+
+  //  Generate OTP
+  const otp = generateOTP();
+
+  //  Delete old OTPs
+  await OTP.deleteMany({ email: { $eq: email } });
+
+  //  Save new OTP
   await OTP.create({
     email,
     otp,
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 min
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 min expiry
   });
 
   //  Send email
@@ -48,4 +70,4 @@ const sendOTP = asyncHandler(async (req, res) => {
   );
 });
 
-export {sendOTP}
+export { sendOTP };

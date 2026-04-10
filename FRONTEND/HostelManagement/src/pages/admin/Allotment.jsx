@@ -37,7 +37,7 @@ const AdminAllotment = () => {
     fetchAllotted();
   }, []);
 
-  // 🔥 START
+  //  ACTIONS (UNCHANGED)
   const handleStart = async () => {
     if (loading) return;
 
@@ -53,7 +53,6 @@ const AdminAllotment = () => {
     }
   };
 
-  // 🔥 TOGGLE
   const handleToggle = async () => {
     if (!cycle || loading) return;
 
@@ -68,7 +67,6 @@ const AdminAllotment = () => {
     }
   };
 
-  // 🔥 RUN ALLOTMENT
   const handleRun = async () => {
     if (!cycle || cycle.applicationOpen) {
       return alert("Close applications first");
@@ -87,7 +85,6 @@ const AdminAllotment = () => {
     }
   };
 
-  // 🔥 FORCE CLOSE
   const handleForceClose = async () => {
     if (!window.confirm("Force close cycle?")) return;
 
@@ -101,46 +98,107 @@ const AdminAllotment = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
 
-      <h2 className="text-2xl font-bold">Allotment Panel</h2>
+      {/* Title */}
+      <h2 className="text-3xl font-bold text-gray-800">
+        Allotment Control Panel
+      </h2>
 
-      <div className="bg-blue-100 p-4 rounded">
-        <p><strong>Status:</strong> {cycle?.status || "No cycle"}</p>
-        <p>
-          <strong>Applications:</strong>{" "}
-          {cycle?.applicationOpen ? "Open" : "Closed"}
-        </p>
+      {/* STATUS CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <div className="bg-white rounded-2xl shadow p-6 border-l-4 border-purple-500">
+          <p className="text-gray-500">Cycle Status</p>
+          <p className="text-xl font-bold mt-1">
+            {cycle?.status || "No cycle"}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow p-6 border-l-4 border-blue-500">
+          <p className="text-gray-500">Applications</p>
+          <p className="text-xl font-bold mt-1">
+            {cycle?.applicationOpen ? "Open" : "Closed"}
+          </p>
+        </div>
+
       </div>
 
-      <div className="flex gap-4 flex-wrap">
+      {/* ACTION BUTTONS */}
+      <div className="bg-white rounded-2xl shadow p-6 flex flex-wrap gap-4">
 
-        <button onClick={handleStart} className="bg-green-600 text-white px-4 py-2 rounded">
-          Start Cycle
+        <button
+          onClick={handleStart}
+          disabled={loading}
+          className={`px-5 py-2 rounded-lg text-white font-medium transition ${
+            loading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
+          }`}
+        >
+          {loading ? "Processing..." : "Start Cycle"}
         </button>
 
-        <button onClick={handleToggle} className="bg-blue-600 text-white px-4 py-2 rounded">
+        <button
+          onClick={handleToggle}
+          disabled={!cycle || loading}
+          className="px-5 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700"
+        >
           Toggle Applications
         </button>
 
-        <button onClick={handleRun} className="bg-purple-600 text-white px-4 py-2 rounded">
+        <button
+          onClick={handleRun}
+          disabled={!cycle || cycle?.applicationOpen}
+          className={`px-5 py-2 rounded-lg text-white ${
+            !cycle || cycle?.applicationOpen
+              ? "bg-gray-400"
+              : "bg-purple-600 hover:bg-purple-700"
+          }`}
+        >
           Run Allotment
         </button>
 
-        <button onClick={handleForceClose} className="bg-red-600 text-white px-4 py-2 rounded">
+        <button
+          onClick={handleForceClose}
+          className="px-5 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700"
+        >
           Force Close
         </button>
 
       </div>
 
-      <div className="bg-white p-4 shadow rounded">
-        <h3>Allotted Students</h3>
+      {/* TABLE */}
+      <div className="bg-white rounded-2xl shadow overflow-hidden">
 
-        {data.map((app) => (
-          <div key={app._id}>
-            {app.studentId?.userId?.fullName} → {app.allottedHostel?.name}
+        <div className="p-6 border-b">
+          <h3 className="text-lg font-semibold">Allotted Students</h3>
+        </div>
+
+        {data.length === 0 ? (
+          <p className="p-6 text-gray-500">No allotments yet</p>
+        ) : (
+          <div className="divide-y">
+            {data.map((app) => (
+              <div
+                key={app._id}
+                className="p-4 flex justify-between items-center hover:bg-gray-50 transition"
+              >
+                <div>
+                  <p className="font-medium">
+                    {app.studentId?.userId?.fullName}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {app.allottedHostel?.name}
+                  </p>
+                </div>
+
+                <span className="text-sm text-gray-400">
+                  Room {app.roomId?.roomNumber || "--"}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
+
       </div>
 
     </div>

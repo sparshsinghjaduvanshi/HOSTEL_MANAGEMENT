@@ -5,47 +5,32 @@ const RoomChange = () => {
   const [targetId, setTargetId] = useState("");
   const [reason, setReason] = useState("");
 
-  const handleSubmit = async () => {
-    try {
-      await createRoomChange({
-        targetStudentId: targetId || null,
-        reason
-      });
-
-      alert("Request submitted!");
-      setTargetId("");
-      setReason("");
-
-    } catch (err) {
-      alert(err.response?.data?.message);
-    }
+  const submit = async () => {
+    await createRoomChange({ targetStudentId: targetId || null, reason });
+    alert("Request sent");
+    setTargetId("");
+    setReason("");
   };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Room Change Request</h2>
+      <h2 className="text-2xl font-bold">Room Change</h2>
 
       <div className="bg-white p-6 rounded-xl shadow space-y-4">
 
-        <input
-          placeholder="Target Student ID (optional for swap)"
-          value={targetId}
-          onChange={(e) => setTargetId(e.target.value)}
-          className="input"
-        />
+        <input value={targetId}
+          onChange={e => setTargetId(e.target.value)}
+          placeholder="Target Student ID"
+          className="input" />
 
-        <textarea
+        <textarea value={reason}
+          onChange={e => setReason(e.target.value)}
           placeholder="Reason"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          className="input"
-        />
+          className="input" />
 
-        <button
-          onClick={handleSubmit}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          Submit Request
+        <button onClick={submit}
+          className="bg-blue-600 text-white px-4 py-2 rounded">
+          Submit
         </button>
 
       </div>

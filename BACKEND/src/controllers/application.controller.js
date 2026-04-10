@@ -14,6 +14,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js"
 import { getAcademicYear } from "../utils/academicYear.js";
+import { Room } from "../models/room.model.js"
 
 
 // 1. Apply for hostels
@@ -142,9 +143,9 @@ const applyForHostel = asyncHandler(async (req, res) => {
 const startAllotment = asyncHandler(async (req, res) => {
 
   const academicYear = getAcademicYear();
-  console.log("🔥 START ALLOTMENT HIT");
+  console.log(" START ALLOTMENT HIT");
 
-  // 🔥 prevent multiple active cycles
+  //  prevent multiple active cycles
   const activeCycle = await AllotmentCycle.findOne({
     status: "open"
   });
@@ -154,7 +155,7 @@ const startAllotment = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Another cycle is already active");
   }
 
-  // 🔥 find last cycle
+  //  find last cycle
   const lastCycle = await AllotmentCycle.findOne({ academicYear })
     .sort({ cycleNumber: -1 });
 
@@ -162,19 +163,35 @@ const startAllotment = asyncHandler(async (req, res) => {
     ? lastCycle.cycleNumber + 1
     : 1;
 
- const count = await AllotmentCycle.countDocuments({ academicYear });
+  const count = await AllotmentCycle.countDocuments({ academicYear });
 
-const cycleNumber = count + 1;
+  const cycleNumber = count + 1;
 
-const cycle = await AllotmentCycle.create({
-  name: `Cycle ${academicYear} - ${cycleNumber}`,
-  academicYear,
-  cycleNumber,
-  status: "open",
-  applicationOpen: true,
-  startDate: new Date(),
-  endDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
-});
+  const cycle = await AllotmentCycle.create({
+    name: `Cycle ${academicYear} - ${cycleNumber}`,
+    academicYear,
+    cycleNumber,
+    status: "open",
+    applicationOpen: true,
+    startDate: new Date(),
+    endDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
+  });
+
+  try {
+    const result = await Student.updateMany(
+      {}, // empty filter = all students
+      { $set: { isDocumentUploadAllowed: true } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Student permission updated successfully",
+      data: result
+    });
+
+  } catch (error) {
+    throw new ApiError(400, "Student permission not changed");
+  }
 
   return res.status(201).json({
     success: true,
@@ -197,7 +214,7 @@ const runAllotment = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Cycle is not active");
   }
 
-  // ❗ ensure applications are closed
+  //  ensure applications are closed
   if (cycle.applicationOpen) {
     throw new ApiError(
       400,
@@ -212,6 +229,10 @@ const runAllotment = asyncHandler(async (req, res) => {
   })
     .populate("preferences")
     .sort({ priorityScore: -1 });
+
+  if (applications.length === 0) {
+    throw new ApiError(400, "No approved applications available for allotment");
+  }
 
   for (const app of applications) {
     let allocated = false;
@@ -243,7 +264,7 @@ const runAllotment = asyncHandler(async (req, res) => {
     }
   }
 
-  // 🔥 CLOSE CYCLE
+  //  CLOSE CYCLE
   cycle.status = "closed";
   await cycle.save();
 
@@ -405,14 +426,14 @@ const getAllottedStudents = asyncHandler(async (req, res) => {
 });
 
 const cancelApplication = asyncHandler(async (req, res) => {
-  // 🔥 Step 1: get student from user
+  //  Step 1: get student from user
   const student = await Student.findOne({ userId: req.user._id });
 
   if (!student) {
     throw new ApiError(404, "Student not found");
   }
 
-  // 🔥 Step 2: find application using studentId
+  //  Step 2: find application using studentId
   const application = await Application.findOne({
     studentId: student._id
   });
@@ -421,18 +442,18 @@ const cancelApplication = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Application not found");
   }
 
-  // ❌ Cannot cancel after allotment
+  //  Cannot cancel after allotment
   if (application.isAllotted) {
     throw new ApiError(400, "Cannot cancel after allotment");
   }
 
-  // 🔥 Save old data for logging
+  //  Save old data for logging
   const oldData = application.toObject();
 
-  // 🗑️ Delete application
+  //  Delete application
   await application.deleteOne();
 
-  // 🔐 Logging
+  //  Logging
   await createLog(req, {
     userId: req.user._id,
     action: "DELETE",
@@ -449,7 +470,7 @@ const cancelApplication = asyncHandler(async (req, res) => {
 
 const reAllotWaitlisted = asyncHandler(async (req, res) => {
 
-  // 🔥 Get last CLOSED cycle
+  //  Get last CLOSED cycle
   const cycle = await AllotmentCycle.findOne({
     status: "closed"
   }).sort({ createdAt: -1 });
@@ -462,7 +483,7 @@ const reAllotWaitlisted = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Re-allotment already active");
   }
 
-  // 🔥 Open re-allot window
+  //  Open re-allot window
   const now = new Date();
 
   cycle.reAllotmentOpen = true;
@@ -473,7 +494,7 @@ const reAllotWaitlisted = asyncHandler(async (req, res) => {
 
   await cycle.save();
 
-  // 🔥 Only waitlisted from THIS cycle
+  //  Only waitlisted from THIS cycle
   const applications = await Application.find({
     cycleId: cycle._id,
     allocationStatus: "waitlisted"

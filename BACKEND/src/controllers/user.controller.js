@@ -1,249 +1,205 @@
 import mongoose from "mongoose";
-import { asyncHandler } from "../utils/asyncHandler.js"
-import { ApiError } from '../utils/ApiError.js'
-import { ApiResponse } from "../utils/ApiResponse.js"
-import jwt from "jsonwebtoken"
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import validator from "validator";
+
 import { User } from "../models/user.model.js";
 import { Student } from "../models/student.model.js";
 import { Admin } from "../models/admin.model.js";
-import crypto from "crypto"; //built in node.js module used to generate secure random tokens
-import { sendEmail } from "../utils/sendEmail.js";
 import { OTP } from "../models/otp.model.js";
+
+import { sendEmail } from "../utils/sendEmail.js";
 import { createLog } from "../services/log.service.js";
 
 
+// ================= HELPERS =================
 
-const generateAccessAndRefereshTokens = async (userId) => {
-    try {
-        const user = await User.findById(userId)
-        if (!user) {
-            throw new ApiError(404, "User not found for token generation");
-        }
-        const accessToken = user.generateAccessToken()
-        const refreshToken = user.generateRefreshToken()
+const sanitizeString = (value) => {
+    if (typeof value !== "string") return "";
+    return validator.escape(value.trim());
+};
 
-        user.refreshToken = refreshToken
-        await user.save({ validateBeforeSave: false })
-        return { accessToken, refreshToken }
-
-    } catch (error) {
-        console.log(error)
-        throw new ApiError(400, "Something went wrong while generating the refresh and access token.")
+const validatePassword = (password) => {
+    if (!validator.isStrongPassword(password, {
+        minLength: 6,
+        minNumbers: 1,
+        minUppercase: 1,
+    })) {
+        throw new ApiError(400, "Weak password (min 6 chars, 1 number, 1 uppercase)");
     }
-}
+};
+
+const generateTokens = async (userId) => {
+    const user = await User.findById(userId);
+    if (!user) throw new ApiError(404, "User not found");
+
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    return { accessToken, refreshToken };
+};
+
+
+// ================= REGISTER =================
 
 const registerStudent = asyncHandler(async (req, res) => {
-    try {
-        console.log(req.body);
+    let { fullName, email, gender, password, phone, enrollmentNo, otp } = req.body;
 
-        let { fullName, email, gender, password, phone, enrollmentNo, otp } = req.body;
+    // Sanitize inputs
+    fullName = sanitizeString(fullName);
+    email = sanitizeString(email).toLowerCase();
+    gender = sanitizeString(gender);
+    phone = sanitizeString(phone);
+    enrollmentNo = sanitizeString(enrollmentNo);
+    otp = String(otp).trim();
 
-        // ✅ Fix type issue
-        otp = String(otp);
-
-        // 🔥 1. Validate input
-        if (
-            [fullName, email, password, gender, phone, enrollmentNo, otp].some(
-                (field) => !field || String(field).trim() === ""
-            )
-        ) {
-            throw new ApiError(400, "All fields including OTP are required");
-        }
-
-        // 🔥 2. Normalize data
-        email = email.toLowerCase().trim();
-        fullName = fullName.trim();
-        otp = otp.trim();
-
-        // 🔥 3. Restrict email domain
-        if (!email.endsWith("@curaj.ac.in")) {
-            throw new ApiError(400, "Use your college email");
-        }
-
-        // 🔥 4. Verify OTP
-        const otpRecord = await OTP.findOne({ email }).sort({ createdAt: -1 });
-
-        if (!otpRecord) {
-            throw new ApiError(400, "OTP not found");
-        }
-
-        if (otpRecord.otp !== otp) {
-            throw new ApiError(400, "Invalid OTP");
-        }
-
-        if (otpRecord.expiresAt < new Date()) {
-            throw new ApiError(400, "OTP expired");
-        }
-
-        // 🔥 5. Check existing user
-        const existedUser = await User.findOne({ email });
-        if (existedUser) {
-            throw new ApiError(400, "User already exists with this email");
-        }
-
-        // 🔥 6. Create User
-        const createdUser = await User.create({
-            fullName,
-            email,
-            password,
-            role: "student",
-        });
-
-        if (!createdUser) {
-            throw new ApiError(500, "Failed to create user");
-        }
-
-        // 🔥 7. Create Student
-        await Student.create({
-            userId: createdUser._id,
-            phone,
-            enrollmentNo,
-            gender
-        });
-
-        // 🔥 8. Delete OTP after success
-        await OTP.deleteMany({ email });
-
-        // 🔥 9. Logging
-        await createLog(req, {
-            action: "REGISTER",
-            targetTable: "User",
-            targetId: createdUser._id,
-            newData: {
-                email: createdUser.email,
-                role: createdUser.role,
-            },
-        });
-
-        // 🔥 10. Response
-        return res.status(201).json(
-            new ApiResponse(201, createdUser, "Student registered successfully")
-        );
-
-    } catch (error) {
-        throw error;
+    // Validate required
+    if (!fullName || !email || !password || !gender || !phone || !enrollmentNo || !otp) {
+        throw new ApiError(400, "All fields are required");
     }
+
+    // Email validation
+    if (!validator.isEmail(email)) {
+        throw new ApiError(400, "Invalid email format");
+    }
+
+    if (!email.endsWith("@curaj.ac.in")) {
+        throw new ApiError(400, "Use college email only");
+    }
+
+    // Password validation
+    validatePassword(password);
+
+    // Phone validation
+    if (!validator.isMobilePhone(phone, "en-IN")) {
+        throw new ApiError(400, "Invalid phone number");
+    }
+
+    // OTP validation
+    const otpRecord = await OTP.findOne({ email }).sort({ createdAt: -1 });
+
+    if (!otpRecord || otpRecord.otp !== otp || otpRecord.expiresAt < new Date()) {
+        throw new ApiError(400, "Invalid or expired OTP");
+    }
+
+    // Check existing user (safe query)
+    const existedUser = await User.findOne({ email: { $eq: email } });
+    if (existedUser) {
+        throw new ApiError(400, "User already exists");
+    }
+
+    // Create user
+    const user = await User.create({
+        fullName,
+        email,
+        password,
+        role: "student",
+    });
+
+    await Student.create({
+        userId: user._id,
+        phone,
+        enrollmentNo,
+        gender,
+    });
+
+    await OTP.deleteMany({ email });
+
+    await createLog(req, {
+        action: "REGISTER",
+        targetTable: "User",
+        targetId: user._id,
+    });
+
+    return res.status(201).json(
+        new ApiResponse(201, user, "Student registered successfully")
+    );
 });
 
+
+// ================= LOGIN =================
+
 const loginUser = asyncHandler(async (req, res) => {
-    //fetch input data
-    const { email, password } = req.body
+    let { email, password } = req.body;
 
-    //check if email and password is entered or not
+    email = sanitizeString(email).toLowerCase();
+
     if (!email || !password) {
-        throw new ApiError(400, "Email and password are required");
+        throw new ApiError(400, "Email & password required");
     }
 
-    //email normalization
-    const normalizedEmail = email.toLowerCase().trim();
+    if (!validator.isEmail(email)) {
+        throw new ApiError(400, "Invalid email");
+    }
 
-    const user = await User.findOne({ email: normalizedEmail })
+    const user = await User.findOne({ email: { $eq: email } });
 
-    //checking if user existed or not
     if (!user) {
-
-        await createLog(req, {
-            action: "LOGIN",
-            targetTable: "User",
-            newData: {
-                email: normalizedEmail,
-                status: "FAILED_USER_NOT_FOUND"
-            }
-        });
-        throw new ApiError(404, "User does not exist")
-    }
-    const isPasswordValid = await user.isPasswordCorrect(password)
-
-    //check if password is working or not
-    if (!isPasswordValid) {
-
-        await createLog(req, {
-            action: "LOGIN",
-            targetTable: "User",
-            targetId: user._id,
-            newData: {
-                status: "FAILED_WRONG_PASSWORD"
-            }
-        });
-
-        throw new ApiError(401, "Invalid user credentials")
+        throw new ApiError(401, "Invalid credentials");
     }
 
     if (!user.isActive) {
-        throw new ApiError(403, "Account is deactivated");
+        throw new ApiError(403, "Account deactivated");
     }
 
-    //generating access and refresh Token
-    const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(user._id)
+    const isValid = await user.isPasswordCorrect(password);
 
-    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
-
-    const options = {
-        httpOnly: true,
-        secure: true
+    if (!isValid) {
+        throw new ApiError(401, "Invalid credentials");
     }
+
+    const { accessToken, refreshToken } = await generateTokens(user._id);
+
+    const safeUser = await User.findById(user._id).select("-password -refreshToken");
+
+    const options = { httpOnly: true, secure: true };
 
     await createLog(req, {
         userId: user._id,
         action: "LOGIN",
-        targetTable: "User",
-        targetId: user._id
+        targetId: user._id,
     });
 
     return res
         .status(200)
         .cookie("accessToken", accessToken, options)
         .cookie("refreshToken", refreshToken, options)
-        .json(
-            new ApiResponse(
-                200,
-                {
-                    user: loggedInUser, accessToken, refreshToken
-                },
-                "User logged In Successfully"
-            )
-        )
+        .json(new ApiResponse(200, { user: safeUser }, "Login successful"));
+});
 
-})
+
+// ================= LOGOUT =================
 
 const logoutUser = asyncHandler(async (req, res) => {
-    await User.findByIdAndUpdate(
-        req.user._id,
-        {
-            $unset: {
-                refreshToken: 1// this remove the field from document
-            }
-        },
-        {
-            new: true
-        }
-    )
+    await User.findByIdAndUpdate(req.user._id, {
+        $unset: { refreshToken: 1 },
+    });
 
-    const options = {
-        httpOnly: true,
-        secure: true
-    }
+    const options = { httpOnly: true, secure: true };
 
     await createLog(req, {
         userId: req.user._id,
         action: "LOGOUT",
-        targetTable: "User",
-        targetId: req.user._id
     });
 
     return res
         .status(200)
         .clearCookie("accessToken", options)
         .clearCookie("refreshToken", options)
-        .json(new ApiResponse(200, {}, "User logged Out"))
-})
+        .json(new ApiResponse(200, {}, "Logged out"));
+});
+
+
+// ================= CURRENT USER =================
 
 const getCurrentUser = asyncHandler(async (req, res) => {
     const user = req.user;
-
-    if (!user) {
-        throw new ApiError(400, "Error fetching user data");
-    }
 
     let roleData = null;
 
@@ -255,227 +211,127 @@ const getCurrentUser = asyncHandler(async (req, res) => {
         roleData = await Admin.findOne({ userId: user._id });
     }
 
-    // 🔥 DO NOT THROW ERROR HERE
-    if (!roleData) {
-        console.log("⚠️ Role data not found for user:", user._id);
-    }
-
-    await createLog(req, {
-        userId: user._id,
-        action: "VIEW",
-        targetTable: "User",
-        newData: { type: "CURRENT_USER" }
-    });
-
     return res.status(200).json(
-        new ApiResponse(
-            200,
-            {
-                user,
-                roleData: roleData || null // ✅ IMPORTANT
-            },
-            "User fetched successfully."
-        )
+        new ApiResponse(200, { user, roleData }, "User fetched")
     );
 });
 
+
+// ================= REFRESH TOKEN =================
+
 const refreshAccessToken = asyncHandler(async (req, res) => {
-    const incomingRefreshToken = req.cookies?.refreshToken || req.body.refreshToken
+    const incoming = req.cookies?.refreshToken || req.body.refreshToken;
 
-    if (!incomingRefreshToken) {
-        throw new ApiError(400, "unauthorized request")
+    if (!incoming) throw new ApiError(401, "Unauthorized");
+
+    const decoded = jwt.verify(incoming, process.env.REFRESH_TOKEN_SECRET);
+
+    const user = await User.findById(decoded._id);
+
+    if (!user || user.refreshToken !== incoming) {
+        throw new ApiError(401, "Invalid refresh token");
     }
 
-    try {
-        const decodedToken = jwt.verify(
-            incomingRefreshToken,
-            process.env.REFRESH_TOKEN_SECRET
-        )
+    const { accessToken, refreshToken } = await generateTokens(user._id);
 
-        const user = await User.findById(decodedToken?._id)
+    return res.status(200).json(
+        new ApiResponse(200, { accessToken, refreshToken }, "Token refreshed")
+    );
+});
 
-        if (!user) {
-            throw new ApiError(401, "Invalid refresh Token")
-        }
 
-        if (incomingRefreshToken !== user?.refreshToken) {
-            throw new ApiError(401, "Refresh token is expired or used")
-        }
-        const options = {
-            httpOnly: true,
-            secure: true
-        }
-
-        const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(user._id)
-        await createLog(req, {
-            userId: user._id,
-            action: "REFRESH_TOKEN",
-            targetTable: "User",
-            targetId: user._id
-        });
-        return res
-            .status(200)
-            .cookie("accessToken", accessToken, options)
-            .cookie("refreshToken", refreshToken, options)
-            .json(
-                new ApiResponse(
-                    200,
-                    { accessToken, refreshToken },
-                    "Access token refreshed"
-                )
-            )
-    } catch (error) {
-        throw new ApiError(401, error?.message || "Invalid refresh token")
-    }
-
-})
+// ================= CHANGE PASSWORD =================
 
 const changeCurrentPassword = asyncHandler(async (req, res) => {
-    //taking old and new password from the input
-    const { oldPassword, newPassword } = req.body
+    const { oldPassword, newPassword } = req.body;
 
-    //checking password
-    const user = await User.findById(req.user?._id)
-    if (!user) {
-        throw new ApiError(404, "User not found");
-    }
-    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+    validatePassword(newPassword);
 
-    if (!isPasswordCorrect) {
-        throw new ApiError(400, "Invalid old password")
+    const user = await User.findById(req.user._id);
+
+    if (!(await user.isPasswordCorrect(oldPassword))) {
+        throw new ApiError(400, "Wrong old password");
     }
 
-    user.password = newPassword
-    await user.save({ validateBeforeSave: false })
+    user.password = newPassword;
+    await user.save();
 
-    await createLog(req, {
-        userId: req.user._id,
-        action: "UPDATE",
-        targetTable: "User",
-        targetId: req.user._id,
-        newData: { type: "PASSWORD_CHANGED" }
-    });
+    return res.status(200).json(
+        new ApiResponse(200, {}, "Password updated")
+    );
+});
 
-    return res
-        .status(200)
-        .json(new ApiResponse(200, {}, "Password changed successfully"))
-})
+
+// ================= FORGOT PASSWORD =================
 
 const forgotPassword = asyncHandler(async (req, res) => {
     let { email } = req.body;
 
-    // ✅ 1. Validate input
-    if (!email || email.trim() === "") {
-        throw new ApiError(400, "Email is required");
+    email = sanitizeString(email).toLowerCase();
+
+    if (!validator.isEmail(email)) {
+        throw new ApiError(400, "Invalid email");
     }
 
-    // ✅ 2. Normalize email
-    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: { $eq: email } });
 
-    if (!normalizedEmail.includes("@")) {
-        throw new ApiError(400, "Invalid email format");
-    }
-
-    const user = await User.findOne({ email: normalizedEmail });
-
-    // ✅ 3. Always return same response (prevent user enumeration)
     if (!user) {
-        return res.status(200).json(
-            new ApiResponse(200, {}, "If this email exists, a reset link has been sent")
-        );
+        return res.json(new ApiResponse(200, {}, "If exists, email sent"));
     }
 
-    // ✅ 4. Generate reset token
     const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashed = crypto.createHash("sha256").update(resetToken).digest("hex");
 
-    const hashedToken = crypto
-        .createHash("sha256")
-        .update(resetToken)
-        .digest("hex");
-
-    // ✅ 5. Save hashed token in DB
-    user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpiry = Date.now() + 10 * 60 * 1000; // 10 min
+    user.resetPasswordToken = hashed;
+    user.resetPasswordExpiry = Date.now() + 10 * 60 * 1000;
 
     await user.save({ validateBeforeSave: false });
 
-    // ✅ 6. FIXED reset URL (IMPORTANT)
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-    // ❌ Don't use backend localhost URL
 
-    try {
-        // ✅ 7. Send email
-        await sendEmail({
-            to: user.email,
-            subject: "Password Reset Request",
-            text: `Reset your password using this link: ${resetUrl}`,
-            html: `
-                <h2>Password Reset</h2>
-                <p>Click below to reset your password:</p>
-                <a href="${resetUrl}">${resetUrl}</a>
-                <p>This link will expire in 10 minutes.</p>
-            `
-        });
+    await sendEmail({
+        to: user.email,
+        subject: "Reset Password",
+        text: resetUrl,
+    });
 
-        // ✅ 8. Logging
-        await createLog(req, {
-            action: "UPDATE",
-            targetTable: "User",
-            targetId: user._id,
-            newData: {
-                email: normalizedEmail,
-                type: "PASSWORD_RESET_REQUEST"
-            }
-        });
-
-        return res.status(200).json(
-            new ApiResponse(200, {}, "Reset link sent to email")
-        );
-
-    } catch (error) {
-        // ✅ 9. Cleanup if email fails (VERY IMPORTANT)
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpiry = undefined;
-        await user.save({ validateBeforeSave: false });
-
-        throw new ApiError(500, "Email could not be sent");
-    }
+    return res.json(new ApiResponse(200, {}, "Reset link sent"));
 });
 
+
+// ================= DELETE USER =================
+
 const deleteUser = asyncHandler(async (req, res) => {
-    const { id } = req.params
-    const user = await User.findById(id)
-    if (!user) {
-        throw new ApiError(400, "Data is not received properly")
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new ApiError(400, "Invalid ID");
     }
+
+    const user = await User.findById(id);
+
+    if (!user) throw new ApiError(404, "User not found");
 
     if (user.role === "admin") {
         throw new ApiError(403, "Cannot delete admin");
     }
 
-    // ✅ soft delete
     user.isActive = false;
+    await user.save();
 
-    const oldData = {
-        isActive: user.isActive,
-        role: user.role
-    };
+    return res.json(new ApiResponse(200, {}, "User deactivated"));
+});
 
-    user.isActive = false;
-    await user.save({ validateBeforeSave: false });
 
-    await createLog(req, {
-        userId: req.user._id,
-        action: "DELETE",
-        targetTable: "User",
-        targetId: user._id,
-        oldData,
-        newData: { isActive: false }
-    });
+// ================= EXPORT =================
 
-    return res.status(200).json(
-        new ApiResponse(200, {}, "User deactivated successfully")
-    );
-})
-
-export { registerStudent, loginUser, logoutUser, getCurrentUser, refreshAccessToken, changeCurrentPassword, forgotPassword, deleteUser };
+export {
+    registerStudent,
+    loginUser,
+    logoutUser,
+    getCurrentUser,
+    refreshAccessToken,
+    changeCurrentPassword,
+    forgotPassword,
+    deleteUser,
+};

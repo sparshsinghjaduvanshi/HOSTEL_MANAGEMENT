@@ -13,6 +13,7 @@ import {
 
 import Layout from './Layout.jsx';
 import AuthPage from "./pages/auth/AuthPage.jsx";
+import Landing from "./pages/Landing";
 
 //  Admin Imports
 import AdminLayout from "./layouts/AdminLayout.jsx";
@@ -21,7 +22,7 @@ import Applications from "./pages/admin/Applications.jsx";
 import Students from "./pages/admin/Students.jsx"
 import AdminAllotment from "./pages/admin/Allotment.jsx";
 
-// 🔥 Student Imports
+//  Student Imports
 import StudentLayout from "./layouts/StudentLayout.jsx";
 import Dashboard from "./pages/student/Dashboard.jsx";
 import StudentAllotment from "./pages/student/Allotment.jsx";
@@ -33,19 +34,23 @@ import Notifications from "./pages/student/Notifications.jsx";
 import Profile from "./pages/student/Profile.jsx";
 import MyRequests from "./pages/student/MyRequests.jsx";
 
-// 🔥 Protected Route
+//  Protected Route
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path="/" element={<Layout />}>
 
+      {/* Landing Page */}
+      <Route index element={<Landing />} />
+
       {/* Auth */}
-      <Route index element={<AuthPage />} />
       <Route path="auth" element={<AuthPage />} />
 
-      {/*  Protected Admin Routes */}
-      <Route path="admin" element={
+      {/* Admin */}
+      <Route
+        path="admin"
+        element={
           <ProtectedRoute role="admin">
             <AdminLayout />
           </ProtectedRoute>
@@ -57,13 +62,15 @@ const router = createBrowserRouter(
         <Route path="allotment" element={<AdminAllotment />} />
       </Route>
 
-      {/*  Protected Student Routes */}
-      <Route path="student" element={
-        <ProtectedRoute>
-          <StudentLayout />
-        </ProtectedRoute>
-      }>
-
+      {/* Student */}
+      <Route
+        path="student"
+        element={
+          <ProtectedRoute>
+            <StudentLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="application" element={<Application />} />
         <Route path="allotment" element={<StudentAllotment />} />
@@ -73,7 +80,6 @@ const router = createBrowserRouter(
         <Route path="notifications" element={<Notifications />} />
         <Route path="profile" element={<Profile />} />
         <Route path="my-requests" element={<MyRequests />} />
-
       </Route>
 
     </Route>

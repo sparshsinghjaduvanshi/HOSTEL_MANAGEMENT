@@ -8,7 +8,7 @@ import {
   getDocuments,
   uploadDocument,
 } from "../../services/document.service.js";
-import ADMIN_API from "../../services/admin.service.js"; // ✅ FIXED
+import ADMIN_API from "../../services/admin.service.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 
 const Application = () => {
@@ -19,7 +19,7 @@ const Application = () => {
   const [hostels, setHostels] = useState([]);
   const [preferences, setPreferences] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [cycle, setCycle] = useState(null); // ✅ FIXED
+  const [cycle, setCycle] = useState(null);
 
   const [documents, setDocuments] = useState([
     { file: null, type: "", address: "" },
@@ -27,21 +27,15 @@ const Application = () => {
 
   const requiredTypes = ["address_proof", "aadhaar", "id_card"];
 
-  // ---------------- FETCH CYCLE ----------------
- const fetchCycle = async () => {
-  try {
-    const res = await ADMIN_API.get("/cycle/active");
+  const fetchCycle = async () => {
+    try {
+      const res = await ADMIN_API.get("/cycle/active");
+      setCycle(res.data.data || null);
+    } catch {
+      setCycle(null);
+    }
+  };
 
-    console.log("API RESPONSE:", res.data); // 🔥 ADD THIS
-
-    setCycle(res.data.data || null);
-  } catch (err) {
-    console.log("CYCLE ERROR:", err);
-    setCycle(null);
-  }
-};
-
-  // ---------------- FETCH APPLICATION ----------------
   const fetchApplication = async () => {
     try {
       const res = await getMyApplication();
@@ -51,11 +45,10 @@ const Application = () => {
     }
   };
 
-  // ---------------- FETCH HOSTELS ----------------
   const fetchHostels = async (gender) => {
     try {
       const res = await getHostels();
-      const filtered = res.data.hostels.filter(
+      const filtered = res.data.data.hostels.filter(
         (h) => h.gender.toLowerCase() === gender.toLowerCase()
       );
       setHostels(filtered);
@@ -64,14 +57,11 @@ const Application = () => {
     }
   };
 
-  // ---------------- USE EFFECT ----------------
-useEffect(() => {
-  if (!user) return; // 🔥 IMPORTANT
+  useEffect(() => {
+    if (!user) return;
 
-  const init = async () => {
-    setLoading(true);
-
-    try {
+    const init = async () => {
+      setLoading(true);
       await fetchCycle();
 
       if (user.roleData?.gender) {
@@ -79,29 +69,18 @@ useEffect(() => {
       }
 
       await fetchApplication();
-    } catch (err) {
-      console.log(err);
-    } finally {
       setLoading(false);
-    }
-  };
+    };
 
-  init();
-}, [user]);
+    init();
+  }, [user]);
 
-  // ---------------- PREFERENCES ----------------
   const handleSelect = (e) => {
     const value = e.target.value;
 
     if (!value) return;
-    if (preferences.includes(value)) {
-      alert("Already selected");
-      return;
-    }
-    if (preferences.length >= 3) {
-      alert("Max 3 hostels allowed");
-      return;
-    }
+    if (preferences.includes(value)) return alert("Already selected");
+    if (preferences.length >= 3) return alert("Max 3 hostels allowed");
 
     setPreferences([...preferences, value]);
   };
@@ -110,40 +89,13 @@ useEffect(() => {
     setPreferences(preferences.filter((p) => p !== id));
   };
 
-  // ---------------- DOCUMENT HANDLING ----------------
-  const handleDocChange = (index, field, value) => {
-    const updated = [...documents];
-    updated[index][field] = value;
-    setDocuments(updated);
-  };
-
-  const addDocumentField = () => {
-    if (documents.length >= 3) {
-      alert("Max 3 documents allowed");
-      return;
-    }
-    setDocuments([
-      ...documents,
-      { file: null, type: "", address: "" },
-    ]);
-  };
-
-  const removeDocumentField = (index) => {
-    setDocuments(documents.filter((_, i) => i !== index));
-  };
-
-  // ---------------- APPLY ----------------
   const handleApply = async () => {
-    // 🔥 FRONTEND SECURITY CHECK
-    
-    console.log("CYCLE:", cycle);
     if (!cycle || !cycle.applicationOpen) {
       return alert("Applications are closed");
     }
 
     if (preferences.length === 0) {
-      alert("Select at least one hostel");
-      return;
+      return alert("Select at least one hostel");
     }
 
     try {
@@ -163,41 +115,42 @@ useEffect(() => {
 
       alert("Application submitted!");
       fetchApplication();
-
     } catch (err) {
-      console.log(err);
       alert(err.response?.data?.message || "Apply failed");
     }
   };
 
-  if (loading) return <p>Loading...</p>;
+  if (loading)
+    return <p className="text-center text-gray-500 mt-10">Loading...</p>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
 
-      {/* 🔥 APPLICATION CLOSED MESSAGE */}
+      {/* Title */}
+      <h2 className="text-3xl font-bold text-gray-800">
+        Hostel Application
+      </h2>
+
+      {/* 🔥 CLOSED ALERT */}
       {(!cycle || !cycle.applicationOpen) && (
-        <div className="bg-red-100 text-red-700 p-3 rounded">
+        <div className="bg-red-100 border border-red-300 text-red-700 p-4 rounded-xl">
           Applications are currently closed.
         </div>
       )}
 
-      <h2 className="text-2xl font-bold">My Application</h2>
-
-      {/* ---------------- APPLY SECTION ---------------- */}
       {!application ? (
-        <div className="bg-white p-6 rounded-xl shadow space-y-6">
+        <div className="bg-white rounded-2xl shadow p-6 space-y-6">
 
-          {/* Hostel Select */}
+          {/* Step 1 */}
           <div>
-            <p className="font-semibold mb-2">
+            <p className="text-lg font-semibold mb-2">
               Select Hostels (Max 3)
             </p>
 
             <select
               onChange={handleSelect}
               className="input"
-              disabled={!cycle || !cycle.applicationOpen} // ✅ FIXED
+              disabled={!cycle || !cycle.applicationOpen}
             >
               <option value="">Select Hostel</option>
               {hostels.map((h) => (
@@ -208,72 +161,76 @@ useEffect(() => {
             </select>
           </div>
 
-          {/* Preferences */}
+          {/* Step 2 */}
           <div>
-            <p className="font-semibold mb-2">Your Preferences:</p>
+            <p className="text-lg font-semibold mb-2">
+              Your Preferences
+            </p>
 
             {preferences.length === 0 ? (
               <p className="text-gray-500">No hostels selected</p>
             ) : (
-              preferences.map((p, index) => {
-                const hostel = hostels.find((h) => h._id === p);
+              <div className="space-y-2">
+                {preferences.map((p, index) => {
+                  const hostel = hostels.find((h) => h._id === p);
 
-                return (
-                  <div
-                    key={p}
-                    className="flex justify-between items-center bg-gray-100 p-3 rounded mb-2"
-                  >
-                    <span>
-                      🏠 Priority {index + 1}: {hostel?.name}
-                    </span>
-
-                    <button
-                      onClick={() => removePreference(p)}
-                      className="text-red-500"
+                  return (
+                    <div
+                      key={p}
+                      className="flex justify-between items-center bg-blue-50 border border-blue-200 p-3 rounded-lg"
                     >
-                      Remove
-                    </button>
-                  </div>
-                );
-              })
+                      <span className="font-medium">
+                        🏠 Priority {index + 1}: {hostel?.name}
+                      </span>
+
+                      <button
+                        onClick={() => removePreference(p)}
+                        className="text-red-500 text-sm hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
 
-          {/* Apply Button */}
+          {/* Apply */}
           <button
             onClick={handleApply}
-            disabled={
-              preferences.length === 0 ||
-              !cycle ||
-              !cycle.applicationOpen
-            }
-            className={`px-4 py-2 rounded text-white ${
+            disabled={!cycle || !cycle.applicationOpen}
+            className={`w-full py-3 rounded-lg text-white font-medium transition ${
               !cycle || !cycle.applicationOpen
                 ? "bg-gray-400"
                 : "bg-blue-600 hover:bg-blue-700"
             }`}
           >
-            Apply
+            Apply for Hostel
           </button>
 
         </div>
       ) : (
-        <div className="bg-white p-6 rounded-xl shadow">
-          <p className="text-lg font-semibold">
-            Status: {application.wardenDecision?.status}
+        <div className="bg-white rounded-2xl shadow p-6 text-center">
+          <p className="text-gray-600">Application Status</p>
+          <p className="text-xl font-bold mt-2">
+            {application.wardenDecision?.status}
           </p>
         </div>
       )}
 
-      {/* ---------------- MODAL ---------------- */}
+      {/* MODAL */}
       {showUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl w-full max-w-md space-y-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
 
-            <h3 className="text-xl font-bold">Upload Documents</h3>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl">
+
+            <h3 className="text-xl font-bold">
+              Upload Required Documents
+            </h3>
 
             {documents.map((doc, index) => (
-              <div key={index} className="space-y-2 border p-3 rounded">
+              <div key={index} className="space-y-2 border p-3 rounded-lg">
 
                 <input
                   type="file"
@@ -307,39 +264,16 @@ useEffect(() => {
                     className="input"
                   />
                 )}
-
-                {documents.length > 1 && (
-                  <button
-                    onClick={() => removeDocumentField(index)}
-                    className="text-red-500 text-sm"
-                  >
-                    Remove
-                  </button>
-                )}
               </div>
             ))}
 
             <button
-              onClick={addDocumentField}
-              className="bg-gray-200 px-3 py-1 rounded"
-            >
-              + Add Another
-            </button>
-
-            <button
+              className="w-full bg-blue-600 text-white py-2 rounded-lg"
               onClick={async () => {
                 try {
                   const formData = new FormData();
 
                   documents.forEach((doc) => {
-                    if (!doc.file || !doc.type) {
-                      throw new Error("All fields required");
-                    }
-
-                    if (doc.type === "address_proof" && !doc.address) {
-                      throw new Error("Address required");
-                    }
-
                     formData.append("files", doc.file);
                     formData.append("types", doc.type);
                     formData.append("addresses", doc.address || "");
@@ -352,24 +286,25 @@ useEffect(() => {
                   await handleApply();
 
                 } catch (err) {
-                  alert(err.message || err.response?.data?.message);
+                  alert(err.message);
                 }
               }}
-              className="bg-blue-600 text-white px-4 py-2 rounded w-full"
             >
-              Upload & Apply
+              Upload & Continue
             </button>
 
             <button
               onClick={() => setShowUploadModal(false)}
-              className="border px-4 py-2 rounded w-full"
+              className="w-full border py-2 rounded-lg"
             >
               Cancel
             </button>
 
           </div>
+
         </div>
       )}
+
     </div>
   );
 };

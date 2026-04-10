@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { getProfile } from "../../services/student.service";
-import { getMyApplication } from "../../services/application.service";
+import { getProfile } from "../../services/student.service.js";
+import { getMyApplication } from "../../services/application.service.js";
+import { Home, Bed, CheckCircle } from "lucide-react";
 
 const Dashboard = () => {
   const [profile, setProfile] = useState(null);
@@ -26,51 +27,93 @@ const Dashboard = () => {
   }, []);
 
   if (loading) {
-    return <p className="text-center mt-10">Loading...</p>;
+    return (
+      <p className="text-center mt-10 text-gray-500">
+        Loading dashboard...
+      </p>
+    );
   }
 
-  return (
-    <div className="space-y-6">
+  const status = application?.wardenDecision?.status || "No Application";
 
-      <h2 className="text-2xl font-bold">Overview</h2>
+  return (
+    <div className="space-y-8">
+
+      {/* Title */}
+      <h2 className="text-3xl font-bold text-gray-800">
+        Overview
+      </h2>
 
       {/* STATUS CARDS */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-        <div className="bg-white p-6 rounded-xl shadow">
-          <p className="text-gray-500">Application Status</p>
-          <p className="text-xl font-bold text-yellow-500">
-            {application?.wardenDecision?.status || "No Application"}
-          </p>
+        {/* Status */}
+        <div className="bg-white rounded-2xl shadow-md p-6 flex justify-between items-center hover:shadow-lg transition">
+          <div>
+            <p className="text-gray-500 text-sm">Application Status</p>
+            <p className="text-xl font-bold text-yellow-500 mt-1">
+              {status}
+            </p>
+          </div>
+          <CheckCircle className="text-yellow-500" />
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow">
-          <p className="text-gray-500">Hostel</p>
-          <p className="text-xl font-bold">
-            {application?.allottedHostel?.name || "Not Allotted"}
-          </p>
+        {/* Hostel */}
+        <div className="bg-white rounded-2xl shadow-md p-6 flex justify-between items-center hover:shadow-lg transition">
+          <div>
+            <p className="text-gray-500 text-sm">Hostel</p>
+            <p className="text-xl font-bold mt-1">
+              {application?.allottedHostel?.name || "Not Allotted"}
+            </p>
+          </div>
+          <Home className="text-blue-500" />
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow">
-          <p className="text-gray-500">Room</p>
-          <p className="text-xl font-bold">
-            {application?.roomId?.roomNumber || "--"}
-          </p>
+        {/* Room */}
+        <div className="bg-white rounded-2xl shadow-md p-6 flex justify-between items-center hover:shadow-lg transition">
+          <div>
+            <p className="text-gray-500 text-sm">Room</p>
+            <p className="text-xl font-bold mt-1">
+              {application?.roomId?.roomNumber || "--"}
+            </p>
+          </div>
+          <Bed className="text-green-500" />
         </div>
 
       </div>
 
       {/* PROFILE */}
       {profile && (
-        <div className="bg-white p-6 rounded-xl shadow">
-          <h3 className="text-lg font-semibold mb-4">Profile</h3>
+        <div className="bg-white rounded-2xl shadow-md p-6">
 
-          <div className="grid grid-cols-2 gap-4">
-            <p><strong>Name:</strong> {profile.user.fullName}</p>
-            <p><strong>Email:</strong> {profile.user.email}</p>
-            <p><strong>Enrollment:</strong> {profile.student.enrollmentId}</p>
-            <p><strong>Phone:</strong> {profile.student.phone}</p>
+          <h3 className="text-lg font-semibold mb-4 text-gray-800">
+            Profile Details
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-sm text-gray-500">Name</p>
+              <p className="font-medium">{profile.user.fullName}</p>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-sm text-gray-500">Email</p>
+              <p className="font-medium">{profile.user.email}</p>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-sm text-gray-500">Enrollment</p>
+              <p className="font-medium">{profile.student.enrollmentId}</p>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-sm text-gray-500">Phone</p>
+              <p className="font-medium">{profile.student.phone}</p>
+            </div>
+
           </div>
+
         </div>
       )}
 

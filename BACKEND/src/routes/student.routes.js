@@ -13,6 +13,8 @@ import {
   cancelRoomChange
 } from "../controllers/student.controller.js";
 
+import { createComplaint, getMyComplaints, deleteComplaint } from "../controllers/maintenance.controller.js";
+
 const studentRouter = Router();
 
 //  All routes are protected
@@ -52,5 +54,9 @@ studentRouter.get("/room-change", getMyRoomChangeRequests);
 
 studentRouter.delete("/room-change/:id", cancelRoomChange);
 
+// Complaints
+studentRouter.post("/complaints", createComplaint);
+studentRouter.get("/complaints", getMyComplaints);
+studentRouter.delete("/complaints/:id", deleteComplaint);
 
 export default studentRouter;

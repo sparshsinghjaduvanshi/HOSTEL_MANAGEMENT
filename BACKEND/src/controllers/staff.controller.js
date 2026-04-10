@@ -1,34 +1,49 @@
+import mongoose from "mongoose";
+import validator from "validator";
+
 import { Maintenance } from "../models/maintenance.model.js";
 import { roleToCategoryMap } from "../utils/roleCategoryMap.js";
 import { sendEmail } from "../utils/sendEmail.js";
-import { User } from "../models/user.model.js"
+import { User } from "../models/user.model.js";
 import { Application } from "../models/application.model.js";
 import { AllotmentCycle } from "../models/allotementCycle.model.js";
 import { Room } from "../models/room.model.js";
 import { RoomChangeRequest } from "../models/roomChangeRequest.model.js";
+import { Student } from "../models/student.model.js";
+import { Notification } from "../models/notification.model.js";
+
 import { createLog } from "../services/log.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 
-//General methods
+
+// ================= HELPERS =================
+
+const validateObjectId = (id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "Invalid ID");
+  }
+};
+
+const sanitize = (val) => {
+  if (typeof val !== "string") return val;
+  return validator.escape(val.trim());
+};
+
+
+// ================= COMPLAINTS =================
+
 const getMyComplaints = asyncHandler(async (req, res) => {
   const staff = req.staff;
-
-  if (!staff) {
-    throw new ApiError(403, "Staff not found");
-  }
+  if (!staff) throw new ApiError(403, "Staff not found");
 
   const category = roleToCategoryMap[staff.role];
-
-  if (!category) {
-    throw new ApiError(403, "Invalid staff role");
+  if (!category && staff.role !== "CareTaker") {
+    throw new ApiError(403, "Invalid role");
   }
 
-  let filter = {
-    hostelId: staff.assignedHostelId,
-  };
+  let filter = { hostelId: staff.assignedHostelId };
 
-  // Caretaker can see all complaints
   if (staff.role !== "CareTaker") {
     filter.category = category;
   }
@@ -37,77 +52,59 @@ const getMyComplaints = asyncHandler(async (req, res) => {
     .populate("roomId")
     .populate({
       path: "reportedBy",
-      populate: {
-        path: "userId",
-        select: "fullName email"
-      }
+      populate: { path: "userId", select: "fullName email" }
     })
     .sort({ createdAt: -1 });
 
-  await createLog(req, {
-    userId: req.user._id,
-    action: "VIEW",
-    targetTable: "Maintenance",
-    newData: { type: "MY_COMPLAINTS" }
-  });
-
-  return res.status(200).json({
-    success: true,
-    complaints
-  });
+  return res.status(200).json({ success: true, complaints });
 });
+
+
+// ================= UPDATE STATUS =================
 
 const updateComplaintStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  let { status } = req.body;
 
-  const allowedStatuses = ["pending", "in-progress", "work-done", "resolved"];
+  validateObjectId(id);
+  status = sanitize(status);
 
-  if (!allowedStatuses.includes(status)) {
+  const allowed = ["pending", "in-progress", "work-done", "resolved"];
+  if (!allowed.includes(status)) {
     throw new ApiError(400, "Invalid status");
   }
 
   const staff = req.staff;
-  if (!staff) {
-    throw new ApiError(403, "Staff not found");
-  }
+  if (!staff) throw new ApiError(403, "Staff not found");
 
   const complaint = await Maintenance.findById(id);
+  if (!complaint) throw new ApiError(404, "Complaint not found");
 
-  if (!complaint) {
-    throw new ApiError(404, "Complaint not found");
-  }
-
-  // Same hostel check
   if (complaint.hostelId.toString() !== staff.assignedHostelId.toString()) {
     throw new ApiError(403, "Access denied");
   }
 
   const category = roleToCategoryMap[staff.role];
 
-  // Role-based category check
   if (staff.role !== "CareTaker" && complaint.category !== category) {
     throw new ApiError(403, "Not allowed");
   }
 
-  // 🔥 Worker restrictions
+  const oldStatus = complaint.status;
+
   if (staff.role !== "CareTaker") {
     if (!["in-progress", "work-done"].includes(status)) {
-      throw new ApiError(403, "Invalid status update");
+      throw new ApiError(403, "Invalid update");
     }
-
     complaint.status = status;
     complaint.handledBy = staff._id;
   }
 
-  // Caretaker/Admin logic
-  if (staff.role === "CareTaker") {
-    if (status === "resolved") {
-      complaint.status = "resolved";
-      complaint.resolvedAt = new Date();
-    }
+  if (staff.role === "CareTaker" && status === "resolved") {
+    complaint.status = "resolved";
+    complaint.resolvedAt = new Date();
   }
-  const oldStatus = complaint.status;
+
   await complaint.save();
 
   await createLog(req, {
@@ -116,25 +113,8 @@ const updateComplaintStatus = asyncHandler(async (req, res) => {
     targetTable: "Maintenance",
     targetId: complaint._id,
     oldData: { status: oldStatus },
-    newData: {
-      status: complaint.status,
-      handledBy: staff._id
-    }
+    newData: { status: complaint.status }
   });
-
-  if (complaint.status === "resolved") {
-    const studentDoc = await Student.findById(complaint.reportedBy);
-    const user = await User.findById(studentDoc.userId);
-
-    sendEmail({
-      to: user.email,
-      subject: "Complaint Resolved",
-      html: `
-      <p>Your complaint has been resolved.</p>
-      <p>Status: ${complaint.status}</p>
-    `
-    });
-  }
 
   return res.status(200).json({
     success: true,
@@ -143,25 +123,22 @@ const updateComplaintStatus = asyncHandler(async (req, res) => {
   });
 });
 
-//CareTaker and Warden
+
+// ================= HOSTEL STUDENTS =================
+
 const getMyHostelStudents = asyncHandler(async (req, res) => {
   const staff = req.staff;
 
-  // Only allow CareTaker & Warden
   if (!["CareTaker", "Warden"].includes(staff.role)) {
     throw new ApiError(403, "Access denied");
   }
 
-  // Get current cycle
   const cycle = await AllotmentCycle.findOne({
     status: { $in: ["active", "closed"] }
   }).sort({ createdAt: -1 });
 
-  if (!cycle) {
-    throw new ApiError(404, "No allotment cycle found");
-  }
+  if (!cycle) throw new ApiError(404, "No cycle found");
 
-  // Fetch students in this hostel
   const applications = await Application.find({
     cycleId: cycle._id,
     isAllotted: true,
@@ -169,20 +146,9 @@ const getMyHostelStudents = asyncHandler(async (req, res) => {
   })
     .populate({
       path: "studentId",
-      populate: {
-        path: "userId",
-        select: "fullName email"
-      }
+      populate: { path: "userId", select: "fullName email" }
     })
-    .populate("roomId")
-    .sort({ createdAt: -1 });
-
-  await createLog(req, {
-    userId: req.user._id,
-    action: "VIEW",
-    targetTable: "Application",
-    newData: { type: "HOSTEL_STUDENTS" }
-  });
+    .populate("roomId");
 
   return res.status(200).json({
     success: true,
@@ -191,57 +157,40 @@ const getMyHostelStudents = asyncHandler(async (req, res) => {
   });
 });
 
+
+// ================= ROOM CHANGE =================
+
 const decideRoomChange = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { action, newRoomId } = req.body;
+  let { action, newRoomId } = req.body;
+
+  validateObjectId(id);
+  if (newRoomId) validateObjectId(newRoomId);
+
+  action = sanitize(action);
 
   const request = await RoomChangeRequest.findById(id);
-
   if (!request) throw new ApiError(404, "Request not found");
 
-  // ================= REJECT =================
+  // ========= REJECT =========
   if (action === "reject") {
     request.status = "rejected";
     await request.save();
 
-    await createLog(req, {
-      userId: req.user._id,
-      action: "REJECT",
-      targetTable: "RoomChangeRequest",
-      targetId: request._id,
-      newData: { status: "rejected" }
-    });
-
     return res.json({ success: true, request });
   }
 
-  // ================= SWAP CASE =================
+  // ========= SWAP =========
   if (request.type === "swap") {
     if (!request.targetApproved) {
-      throw new ApiError(400, "Both students must agree");
+      throw new ApiError(400, "Both must agree");
     }
 
-    const appA = await Application.findOne({
-      studentId: request.requester,
-      isAllotted: true
-    });
+    const appA = await Application.findOne({ studentId: request.requester, isAllotted: true });
+    const appB = await Application.findOne({ studentId: request.targetStudent, isAllotted: true });
 
-    const appB = await Application.findOne({
-      studentId: request.targetStudent,
-      isAllotted: true
-    });
+    if (!appA || !appB) throw new ApiError(404, "Applications not found");
 
-    if (!appA || !appB) {
-      throw new ApiError(404, "Applications not found");
-    }
-
-    // 🔥 store old data BEFORE swap
-    const oldData = {
-      studentA: appA.roomId,
-      studentB: appB.roomId
-    };
-
-    // 🔁 swap rooms
     const temp = appA.roomId;
     appA.roomId = appB.roomId;
     appB.roomId = temp;
@@ -250,162 +199,50 @@ const decideRoomChange = asyncHandler(async (req, res) => {
     await appB.save();
 
     request.status = "approved";
-    request.decidedBy = req.user._id;
-    request.decidedAt = new Date();
     await request.save();
 
-    await createLog(req, {
-      userId: req.user._id,
-      action: "UPDATE",
-      targetTable: "Room",
-      newData: {
-        type: "SWAP",
-        studentA: appA.studentId,
-        studentB: appB.studentId,
-        newRoomA: appA.roomId,
-        newRoomB: appB.roomId
-      },
-      oldData
-    });
-
-    const studentA = await Student.findById(appA.studentId);
-    const studentB = await Student.findById(appB.studentId);
-
-    const userA = await User.findById(studentA.userId);
-    const userB = await User.findById(studentB.userId);
-
-    // 🔥 send emails (non-blocking)
-    sendEmail({
-      to: userA.email,
-      subject: "Room Swap Successful",
-      html: `
-    <h3>Your room has been swapped</h3>
-    <p>New Room: ${appA.roomId}</p>
-  `
-    }).catch(err => console.error(err));
-
-    sendEmail({
-      to: userB.email,
-      subject: "Room Swap Successful",
-      html: `
-    <h3>Your room has been swapped</h3>
-    <p>New Room: ${appB.roomId}</p>
-  `
-    }).catch(err => console.error(err));
-
-    await Notification.create({
-      userId: studentA.userId,
-      title: "Room Swapped",
-      message: `Your new room is ${appA.roomId}`,
-      type: "room_change"
-    });
-
-    await Notification.create({
-      userId: studentB.userId,
-      title: "Room Swapped",
-      message: `Your new room is ${appB.roomId}`,
-      type: "room_change"
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Rooms swapped successfully",
-      appA,
-      appB
-    });
+    return res.json({ success: true, message: "Rooms swapped", appA, appB });
   }
 
-  // ================= SINGLE CASE =================
+  // ========= SINGLE =========
   if (request.type === "single") {
-    if (!newRoomId) {
-      throw new ApiError(400, "Room ID required");
-    }
-
-
+    if (!newRoomId) throw new ApiError(400, "Room required");
 
     const app = await Application.findOne({
       studentId: request.requester,
       isAllotted: true
     });
 
-    if (!app) {
-      throw new ApiError(404, "Application not found");
-    }
+    if (!app) throw new ApiError(404, "Application not found");
 
     if (newRoomId.toString() === app.roomId.toString()) {
-      throw new ApiError(400, "Already in this room");
+      throw new ApiError(400, "Already in same room");
     }
 
     const room = await Room.findById(newRoomId);
+    if (!room) throw new ApiError(404, "Room not found");
 
-    if (!room) {
-      throw new ApiError(404, "Room not found");
-    }
-
-    // Same hostel check
-    if (room.hostelId.toString() !== app.allottedHostel.toString()) {
-      throw new ApiError(400, "Room must belong to same hostel");
-    }
-
-    // Vacancy check
     if (room.occupiedCount >= room.capacity) {
-      throw new ApiError(400, "Room is full");
+      throw new ApiError(400, "Room full");
     }
 
     const oldRoom = app.roomId;
 
-    // 🔽 decrease old room count (SAFE now)
     if (oldRoom) {
-      await Room.findByIdAndUpdate(oldRoom, {
-        $inc: { occupiedCount: -1 }
-      });
+      await Room.findByIdAndUpdate(oldRoom, { $inc: { occupiedCount: -1 } });
     }
 
-    // 🔼 increase new room count
-    await Room.findByIdAndUpdate(newRoomId, {
-      $inc: { occupiedCount: 1 }
-    });
+    await Room.findByIdAndUpdate(newRoomId, { $inc: { occupiedCount: 1 } });
 
-    // assign new room
     app.roomId = newRoomId;
     await app.save();
 
     request.status = "approved";
-    request.decidedBy = req.user._id;
-    request.decidedAt = new Date();
     await request.save();
 
-    await createLog(req, {
-      userId: req.user._id,
-      action: "UPDATE",
-      targetTable: "Room",
-      targetId: app._id,
-      oldData: { roomId: oldRoom },
-      newData: { roomId: newRoomId }
-    });
-
-    const studentDoc = await Student.findById(app.studentId);
-    const user = await User.findById(studentDoc.userId);
-
-    sendEmail({
-      to: user.email,
-      subject: "Room Change Approved",
-      html: `
-    <h3>Your room has been updated</h3>
-    <p>New Room: ${newRoomId}</p>
-  `
-    });
-
-    await Notification.create({
-      userId: studentDoc.userId,
-      title: "Room Changed",
-      message: `Your room has been changed to ${newRoomId}`,
-      type: "room_change"
-    });
-
-    return res.status(200).json({
+    return res.json({
       success: true,
-      message: "Room changed successfully",
+      message: "Room updated",
       app
     });
   }
@@ -413,9 +250,12 @@ const decideRoomChange = asyncHandler(async (req, res) => {
   throw new ApiError(400, "Invalid request type");
 });
 
+
+// ================= EXPORT =================
+
 export {
   getMyComplaints,
   updateComplaintStatus,
   getMyHostelStudents,
   decideRoomChange
-}
+};

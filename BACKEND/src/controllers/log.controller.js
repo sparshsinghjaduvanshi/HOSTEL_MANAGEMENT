@@ -1,40 +1,94 @@
+import mongoose from "mongoose";
+import validator from "validator";
+
 import { Log } from "../models/log.model.js";
-import {asyncHandler} from "../utils/asyncHandler.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 import { createLog } from "../services/log.service.js";
 
-// 1. Get all logs (Admin)
+
+// ================= HELPERS =================
+
+const validateObjectId = (id) => {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new ApiError(400, "Invalid ID");
+    }
+};
+
+const sanitize = (val) => {
+    if (typeof val !== "string") return val;
+    return validator.escape(val.trim());
+};
+
+
+// ================= GET ALL LOGS (ADMIN ONLY) =================
+
 const getAllLogs = asyncHandler(async (req, res) => {
+    // 🔐 Ensure admin
+    if (req.user.role !== "admin") {
+        throw new ApiError(403, "Access denied");
+    }
+
     const logs = await Log.find()
         .populate("userId", "fullName email")
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .lean();
 
-    res.status(200).json({
-        success: true,
-        count: logs.length,
-        logs,
-    });
+    return res.status(200).json(
+        new ApiResponse(200, {
+            count: logs.length,
+            logs
+        }, "All logs fetched")
+    );
 });
 
-// 2. Get logs of current user
+
+// ================= GET MY LOGS =================
+
 const getMyLogs = asyncHandler(async (req, res) => {
-    const logs = await Log.find({ userId: req.user._id })
-        .sort({ createdAt: -1 });
+    const userId = req.user?._id;
+
+    if (!userId) {
+        throw new ApiError(401, "Unauthorized");
+    }
+
+    const logs = await Log.find({
+        userId: { $eq: userId }
+    })
+        .sort({ createdAt: -1 })
+        .lean();
+
     await createLog(req, {
-        userId: req.user._id,
+        userId,
         action: "VIEW",
         targetTable: "Log",
         newData: { type: "MY_LOGS" }
     });
-    res.status(200).json({
-        success: true,
-        logs,
-    });
+
+    return res.status(200).json(
+        new ApiResponse(200, logs, "My logs fetched")
+    );
 });
 
-// 3. Filter logs (powerful)
-const filterLogs = asyncHandler(async (req, res) => {
-    const { action, userId, startDate, endDate } = req.query;
 
+// ================= FILTER LOGS (ADMIN ONLY) =================
+
+const filterLogs = asyncHandler(async (req, res) => {
+    if (req.user.role !== "admin") {
+        throw new ApiError(403, "Access denied");
+    }
+
+    let { action, userId, startDate, endDate } = req.query;
+
+    action = sanitize(action);
+
+    // ✅ Validate ObjectId
+    if (userId) {
+        validateObjectId(userId);
+    }
+
+    // ✅ Validate dates
     if (startDate && isNaN(Date.parse(startDate))) {
         throw new ApiError(400, "Invalid start date");
     }
@@ -46,7 +100,7 @@ const filterLogs = asyncHandler(async (req, res) => {
     let filter = {};
 
     if (action) filter.action = action;
-    if (userId) filter.userId = userId;
+    if (userId) filter.userId = { $eq: userId };
 
     if (startDate || endDate) {
         filter.createdAt = {};
@@ -55,7 +109,8 @@ const filterLogs = asyncHandler(async (req, res) => {
     }
 
     const logs = await Log.find(filter)
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .lean();
 
     await createLog(req, {
         userId: req.user._id,
@@ -67,51 +122,59 @@ const filterLogs = asyncHandler(async (req, res) => {
         }
     });
 
-    res.status(200).json({
-        success: true,
-        logs,
-    });
+    return res.status(200).json(
+        new ApiResponse(200, logs, "Filtered logs fetched")
+    );
 });
 
-// 4. Delete logs (optional cleanup)
+
+// ================= DELETE LOGS (ADMIN ONLY) =================
+
 const deleteLogs = asyncHandler(async (req, res) => {
-    const { olderThanDays } = req.query;
-    let filter = {};
+    if (req.user.role !== "admin") {
+        throw new ApiError(403, "Access denied");
+    }
+
+    let { olderThanDays } = req.query;
 
     if (olderThanDays && isNaN(parseInt(olderThanDays))) {
         throw new ApiError(400, "Invalid number of days");
     }
 
+    let filter = {};
+
     if (olderThanDays) {
         const days = parseInt(olderThanDays);
         const date = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
         filter.createdAt = { $lt: date };
     }
 
-    // 🔹 Count before delete (for logging)
-    const logsToDelete = await Log.countDocuments(filter);
+    const countBefore = await Log.countDocuments(filter);
 
     const result = await Log.deleteMany(filter);
 
-    // 🔐 Logging
     await createLog(req, {
-        userId: req.user?._id,
+        userId: req.user._id,
         action: "DELETE",
         targetTable: "Log",
-        oldData: { deletedCount: logsToDelete, filter },
+        oldData: { deletedCount: countBefore },
         newData: { deletedCount: result.deletedCount }
     });
 
-    res.status(200).json({
-        success: true,
-        message: "Logs deleted successfully",
-        deletedCount: result.deletedCount,
-    });
+    return res.status(200).json(
+        new ApiResponse(200, {
+            deletedCount: result.deletedCount
+        }, "Logs deleted")
+    );
 });
+
+
+// ================= EXPORT =================
 
 export {
     getAllLogs,
     getMyLogs,
     filterLogs,
     deleteLogs
-}
+};
