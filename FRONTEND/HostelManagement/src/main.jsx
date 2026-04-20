@@ -33,6 +33,7 @@ import Complaints from "./pages/student/Complaints.jsx";
 import Notifications from "./pages/student/Notifications.jsx";
 import Profile from "./pages/student/Profile.jsx";
 import MyRequests from "./pages/student/MyRequests.jsx";
+import Staff from "./pages/admin/Staff.jsx";
 
 //  Protected Route
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
@@ -60,6 +61,7 @@ const router = createBrowserRouter(
         <Route path="applications" element={<Applications />} />
         <Route path="students" element={<Students />} />
         <Route path="allotment" element={<AdminAllotment />} />
+        <Route path="staff" element={<Staff />} />
       </Route>
 
       {/* Student */}

@@ -6,7 +6,8 @@ import {
   FileCheck,
   Users,
   Building,
-  LogOut
+  LogOut,
+  UserCheck
 } from "lucide-react";
 
 const navItems = [
@@ -14,6 +15,7 @@ const navItems = [
   { name: "Applications", path: "/admin/applications", icon: FileCheck },
   { name: "Students", path: "/admin/students", icon: Users },
   { name: "Allotment", path: "/admin/allotment", icon: Building },
+  { name: "Staff", path: "/admin/staff", icon: UserCheck },
 ];
 
 const AdminSidebar = () => {

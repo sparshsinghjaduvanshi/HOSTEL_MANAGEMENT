@@ -7,8 +7,9 @@ import { Staff } from "../models/staff.model.js";
 import { Application } from "../models/application.model.js";
 import { AllotmentCycle } from "../models/allotementCycle.model.js";
 import { Admin } from "../models/admin.model.js";
+import {Document} from "../models/document.model.js"
 
-import { createLog } from "../services/log.service.js";
+// import { createLog } from "../services/log.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -57,7 +58,7 @@ const getAllStudentsAdmin = asyncHandler(async (req, res) => {
   requireAdmin(req);
 
   const students = await Student.find()
-    .populate("userId", "fullName email")
+    .populate("userId", "fullName email isActive")
     .lean();
 
   return res.status(200).json(
@@ -69,15 +70,17 @@ const getAllStudentsAdmin = asyncHandler(async (req, res) => {
 // ================= STAFF =================
 
 const getAllStaff = asyncHandler(async (req, res) => {
-  requireAdmin(req);
-
   const staff = await Staff.find()
-    .populate("userId", "fullName email")
-    .populate("assignedHostelId")
-    .lean();
+    .populate({
+      path: "userId",
+      match: { isActive: true }
+    })
+    .populate("assignedHostelId");
 
-  return res.status(200).json(
-    new ApiResponse(200, staff, "All staff fetched")
+  const filtered = staff.filter((s) => s.userId);
+
+  return res.json(
+    new ApiResponse(200, filtered, "Staff fetched")
   );
 });
 
@@ -139,53 +142,89 @@ const getAdminDashboard = asyncHandler(async (req, res) => {
 const createStaff = asyncHandler(async (req, res) => {
   requireAdmin(req);
 
-  let { fullName, email, password, phone, role, assignedHostelId } = req.body;
+  let {
+    fullName,
+    email,
+    password,
+    phone,
+    role,
+    assignedHostelId
+  } = req.body;
 
   fullName = sanitize(fullName);
   email = sanitize(email)?.toLowerCase();
   phone = sanitize(phone);
 
-  if (!validator.isEmail(email)) throw new ApiError(400, "Invalid email");
-  if (!validator.isMobilePhone(phone, "en-IN")) throw new ApiError(400, "Invalid phone");
+  if (!validator.isEmail(email))
+    throw new ApiError(400, "Invalid email");
+
+  if (!validator.isMobilePhone(phone, "en-IN"))
+    throw new ApiError(400, "Invalid phone");
 
   validateObjectId(assignedHostelId);
 
-  const allowedRoles = ["Cleaner", "Carpenter", "Electrician", "CareTaker", "Warden"];
-  if (!allowedRoles.includes(role)) throw new ApiError(400, "Invalid role");
+  const allowedRoles = [
+    "Cleaner",
+    "Carpenter",
+    "Electrician",
+    "CareTaker",
+    "Warden"
+  ];
 
-  const existingUser = await User.findOne({ email: { $eq: email } });
-  if (existingUser) throw new ApiError(400, "User exists");
+  if (!allowedRoles.includes(role))
+    throw new ApiError(400, "Invalid role");
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const existingUser = await User.findOne({ email });
 
-  try {
-    const user = await User.create([{
-      fullName,
-      email,
-      password,
-      role: "staff"
-    }], { session });
+  if (existingUser)
+    throw new ApiError(400, "User already exists");
 
-    const staff = await Staff.create([{
-      userId: user[0]._id,
-      phone,
-      role,
-      assignedHostelId
-    }], { session });
+  const user = await User.create({
+    fullName,
+    email,
+    password,
+    role: "staff"
+  });
 
-    await session.commitTransaction();
+  const staff = await Staff.create({
+    userId: user._id,
+    phone,
+    role,
+    assignedHostelId
+  });
 
-    return res.status(201).json(
-      new ApiResponse(201, staff[0], "Staff created")
-    );
+  return res.status(201).json(
+    new ApiResponse(201, staff, "Staff created")
+  );
+});
 
-  } catch (err) {
-    await session.abortTransaction();
-    throw err;
-  } finally {
-    session.endSession();
+const deleteStaff = asyncHandler(async (req, res) => {
+  requireAdmin(req);
+
+  const { id } = req.params; // userId
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "Invalid ID");
   }
+
+  const user = await User.findById(id);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.role !== "staff") {
+    throw new ApiError(400, "Target user is not staff");
+  }
+
+  await Staff.findOneAndDelete({ userId: id });
+
+  user.isActive = false;
+  await user.save();
+
+  return res.status(200).json(
+    new ApiResponse(200, {}, "Staff removed successfully")
+  );
 });
 
 
@@ -245,25 +284,27 @@ const updateStaffPhoto = asyncHandler(async (req, res) => {
   requireAdmin(req);
 
   const { id } = req.params;
+
   validateObjectId(id);
 
-  if (!req.file) throw new ApiError(400, "File missing");
+  const staff = await Staff.findById(id);
 
-  if (!req.file.mimetype.startsWith("image/")) {
-    throw new ApiError(400, "Only image allowed");
+  if (!staff) {
+    throw new ApiError(404, "Staff not found");
   }
 
-  if (req.file.size > 2 * 1024 * 1024) {
-    throw new ApiError(400, "Max 2MB allowed");
+  if (!req.file?.path) {
+    throw new ApiError(400, "Photo is required");
   }
 
   const uploaded = await uploadOnCLoudinary(req.file.path);
 
-  const staff = await Staff.findByIdAndUpdate(
-    id,
-    { $set: { photo: uploaded.url } },
-    { new: true }
-  );
+  if (!uploaded) {
+    throw new ApiError(500, "Upload failed");
+  }
+
+  staff.photo = uploaded.secure_url;
+  await staff.save();
 
   return res.status(200).json(
     new ApiResponse(200, staff, "Photo updated")
@@ -364,6 +405,26 @@ const forceCloseCycle = asyncHandler(async (req, res) => {
   );
 });
 
+const getStudentDocuments = asyncHandler(async (req, res) => {
+  requireAdmin(req);
+
+  const { id } = req.params;
+
+  validateObjectId(id);
+
+  const documents = await Document.find({
+    studentId: id
+  });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      documents,
+      "Student documents fetched"
+    )
+  );
+});
+
 
 // ================= EXPORT =================
 
@@ -380,5 +441,7 @@ export {
   getActiveCycle,
   toggleApplicationWindow,
   closeCycle,
-  forceCloseCycle
+  forceCloseCycle,
+  deleteStaff,
+  getStudentDocuments
 };

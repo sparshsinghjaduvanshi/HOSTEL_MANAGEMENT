@@ -158,12 +158,14 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const safeUser = await User.findById(user._id).select("-password -refreshToken");
 
-    const options = { httpOnly: true, secure: true };
+    const options = { httpOnly: true, secure: true, sameSite: "lax" };
+
 
     await createLog(req, {
         userId: user._id,
         action: "LOGIN",
         targetId: user._id,
+        targetTable: "User"
     });
 
     return res
@@ -181,11 +183,13 @@ const logoutUser = asyncHandler(async (req, res) => {
         $unset: { refreshToken: 1 },
     });
 
-    const options = { httpOnly: true, secure: true };
+    const options = { httpOnly: true, secure: true, sameSite: "lax" };
 
     await createLog(req, {
         userId: req.user._id,
         action: "LOGOUT",
+        // targetId: req.user._id,
+
     });
 
     return res

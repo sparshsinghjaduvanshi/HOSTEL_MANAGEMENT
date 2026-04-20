@@ -24,7 +24,7 @@ const logSchema = new Schema(
 
     targetTable: {
       type: String,
-      required: true,
+      required: false,
     },
 
     targetId: {

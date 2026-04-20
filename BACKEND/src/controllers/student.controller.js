@@ -44,23 +44,51 @@ const getOrCreateStudent = async (user) => {
 
 const getMyProfile = asyncHandler(async (req, res) => {
   const user = req.user;
-  if (!user) throw new ApiError(401, "Unauthorized");
 
-  const student = await getOrCreateStudent(user);
+  if (!user) {
+    throw new ApiError(401, "Unauthorized");
+  }
+
+  const student =
+    await getOrCreateStudent(user);
 
   return res.status(200).json(
-    new ApiResponse(200, {
-      user: {
-        fullName: user.fullName,
-        email: user.email,
-        photo: user.photo,
-        role: user.role
+    new ApiResponse(
+      200,
+      {
+        user: {
+          fullName:
+            user.fullName,
+          email:
+            user.email,
+          photo:
+            user.photo,
+          role:
+            user.role,
+        },
+
+        student: {
+          phone:
+            student.phone,
+
+          enrollmentNo:
+            student.enrollmentNo,
+
+          gender:
+            student.gender,
+
+          photo:
+            student.photo,
+
+          isDocumentUploadAllowed:
+            student.isDocumentUploadAllowed,
+
+          enrollmentDate:
+            student.enrollmentDate,
+        },
       },
-      student: {
-        phone: student.phone,
-        enrollmentId: student.enrollmentNo
-      }
-    }, "Profile fetched")
+      "Profile fetched"
+    )
   );
 });
 
@@ -111,6 +139,41 @@ const updateProfile = asyncHandler(async (req, res) => {
   );
 });
 
+const updateProfilePhoto = asyncHandler(async (req, res) => {
+  const user = req.user;
+
+  if (!req.file) {
+    throw new ApiError(400, "Photo required");
+  }
+
+  const student =
+    await getOrCreateStudent(user);
+
+  const uploaded =
+    await uploadOnCLoudinary(
+      req.file.path
+    );
+
+  if (!uploaded) {
+    throw new ApiError(
+      500,
+      "Upload failed"
+    );
+  }
+
+  student.photo =
+    uploaded.secure_url;
+
+  await student.save();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      student,
+      "Photo updated"
+    )
+  );
+});
 
 // ================= DOCUMENT =================
 
@@ -377,5 +440,6 @@ export {
   getMyRoomChangeRequests,
   respondToRoomChange,
   createComplaint,
-  getMyComplaints
+  getMyComplaints,
+  updateProfilePhoto
 };

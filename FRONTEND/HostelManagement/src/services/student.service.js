@@ -22,3 +22,6 @@ export const getMyRequests = () =>
 
 export const cancelRequest = (id) =>
   API.delete(`/students/room-change/${id}`);
+
+export const uploadProfilePhoto = (formData) =>
+  API.patch("/students/photo", formData);

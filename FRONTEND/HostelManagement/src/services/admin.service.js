@@ -23,6 +23,13 @@ export const allotRoom = (id, data) =>
 export const getAllStudents = () =>
   ADMIN_API.get("/students");
 
+// Delete Student
+export const deleteStudent = (id) =>
+  ADMIN_API.delete(`/users/${id}`);
+
+export const getStudentDocuments = (id) =>
+  ADMIN_API.get(`/students/${id}/documents`);
+
 // START ALLOTMENT
 export const startAllotment = () =>
   ADMIN_API.post("/allotment/start");
@@ -42,5 +49,18 @@ export const runAllotment = () =>
 
 export const toggleApplicationWindow = () =>
   ADMIN_API.patch("/cycle/toggle-application");
+
+/* Staff */
+export const getAllStaff = () =>
+  ADMIN_API.get("/staff");
+
+export const createStaff = (data) =>
+  ADMIN_API.post("/staff", data);
+
+export const updateStaff = (id, data) =>
+  ADMIN_API.put(`/staff/${id}`, data);
+
+export const deleteStaff = (id) =>
+  ADMIN_API.delete(`/users/${id}`);
 
 export default ADMIN_API;

@@ -4,25 +4,32 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
 
 
-export const verifyJWT = asyncHandler(async(req, _ ,next) =>{
+export const verifyJWT = asyncHandler(async (req, res, next) => {
     try {
-        const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ","")
-    
-        if(!token){
-            throw new ApiError(401, "unauthorized request!")
+        const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "")
+
+        if (!token) {
+            return res.status(401).json({
+                // success: false,
+                message: "Unauthorized",
+            });
         }
-    
+
         const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
-    
+
         const user = await User.findById(decodedToken?._id).select("-password -refreshToken")
-        if(!user){
+        if (!user) {
             throw new ApiError(401, "Invalid access Token")
         }
-    
+
         req.user = user;
         next() //next() is allowed here because this is a express style middleware
-    
+
     } catch (error) {
-        throw new ApiError(401, error?.message || "Invalid access Token")
+        // throw new ApiError(401, error?.message || "Invalid access Token")
+        return res.status(401).json({
+            // success: false,
+            message: "Invalid access token",
+        });
     }
 })

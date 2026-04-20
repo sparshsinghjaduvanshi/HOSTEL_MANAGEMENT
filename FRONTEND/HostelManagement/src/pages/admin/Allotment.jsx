@@ -1,13 +1,22 @@
 import { useEffect, useState } from "react";
 import {
   startAllotment,
-  reAllotWaitlisted,
   getAllottedStudents,
   forceCloseCycle,
   runAllotment,
   toggleApplicationWindow
 } from "../../services/admin.service.js";
+
 import ADMIN_API from "../../services/admin.service.js";
+
+import {
+  Play,
+  Power,
+  Shuffle,
+  RefreshCw,
+  XCircle,
+  BedDouble
+} from "lucide-react";
 
 const AdminAllotment = () => {
   const [data, setData] = useState([]);
@@ -32,20 +41,21 @@ const AdminAllotment = () => {
     }
   };
 
+  const refreshAll = async () => {
+    await fetchCycle();
+    await fetchAllotted();
+  };
+
   useEffect(() => {
-    fetchCycle();
-    fetchAllotted();
+    refreshAll();
   }, []);
 
-  //  ACTIONS (UNCHANGED)
   const handleStart = async () => {
-    if (loading) return;
-
     try {
       setLoading(true);
       await startAllotment();
-      alert("Cycle started!");
-      await fetchCycle();
+      alert("Cycle started");
+      refreshAll();
     } catch (err) {
       alert(err.response?.data?.message);
     } finally {
@@ -54,12 +64,10 @@ const AdminAllotment = () => {
   };
 
   const handleToggle = async () => {
-    if (!cycle || loading) return;
-
     try {
       setLoading(true);
       await toggleApplicationWindow();
-      await fetchCycle();
+      refreshAll();
     } catch {
       alert("Toggle failed");
     } finally {
@@ -68,7 +76,7 @@ const AdminAllotment = () => {
   };
 
   const handleRun = async () => {
-    if (!cycle || cycle.applicationOpen) {
+    if (cycle?.applicationOpen) {
       return alert("Close applications first");
     }
 
@@ -76,8 +84,7 @@ const AdminAllotment = () => {
       setLoading(true);
       await runAllotment();
       alert("Allotment completed");
-      await fetchCycle();
-      await fetchAllotted();
+      refreshAll();
     } catch (err) {
       alert(err.response?.data?.message);
     } finally {
@@ -86,116 +93,185 @@ const AdminAllotment = () => {
   };
 
   const handleForceClose = async () => {
-    if (!window.confirm("Force close cycle?")) return;
+    if (!window.confirm("Close current cycle?")) return;
 
     try {
+      setLoading(true);
       await forceCloseCycle();
-      alert("Cycle closed");
-      await fetchCycle();
+      refreshAll();
     } catch {
-      alert("Error closing");
+      alert("Failed");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="space-y-8">
 
-      {/* Title */}
-      <h2 className="text-3xl font-bold text-gray-800">
-        Allotment Control Panel
-      </h2>
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 
-      {/* STATUS CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-        <div className="bg-white rounded-2xl shadow p-6 border-l-4 border-purple-500">
-          <p className="text-gray-500">Cycle Status</p>
-          <p className="text-xl font-bold mt-1">
-            {cycle?.status || "No cycle"}
+        <div>
+          <h2 className="text-3xl font-bold text-gray-800">
+            Allotment Control Panel
+          </h2>
+          <p className="text-gray-500 mt-1">
+            Manage hostel cycles and allotments.
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow p-6 border-l-4 border-blue-500">
-          <p className="text-gray-500">Applications</p>
-          <p className="text-xl font-bold mt-1">
+        <button
+          onClick={refreshAll}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700"
+        >
+          <RefreshCw size={18} />
+          Refresh
+        </button>
+
+      </div>
+
+      {/* Status Cards */}
+      <div className="grid md:grid-cols-3 gap-6">
+
+        <div className="bg-white p-6 rounded-2xl shadow">
+          <p className="text-gray-500 text-sm">
+            Current Cycle
+          </p>
+
+          <p className="text-xl font-bold mt-2">
+            {cycle?.name || "No Active Cycle"}
+          </p>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow">
+          <p className="text-gray-500 text-sm">
+            Status
+          </p>
+
+          <p className="text-xl font-bold mt-2 capitalize">
+            {cycle?.status || "Closed"}
+          </p>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow">
+          <p className="text-gray-500 text-sm">
+            Applications
+          </p>
+
+          <p className="text-xl font-bold mt-2">
             {cycle?.applicationOpen ? "Open" : "Closed"}
           </p>
         </div>
 
       </div>
 
-      {/* ACTION BUTTONS */}
-      <div className="bg-white rounded-2xl shadow p-6 flex flex-wrap gap-4">
+      {/* Actions */}
+      <div className="bg-white rounded-2xl shadow p-6 grid md:grid-cols-2 xl:grid-cols-4 gap-4">
 
         <button
           onClick={handleStart}
           disabled={loading}
-          className={`px-5 py-2 rounded-lg text-white font-medium transition ${
-            loading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
-          }`}
+          className="flex items-center justify-center gap-2 bg-green-600 text-white py-3 rounded-xl hover:bg-green-700"
         >
-          {loading ? "Processing..." : "Start Cycle"}
+          <Play size={18} />
+          Start Cycle
         </button>
 
         <button
           onClick={handleToggle}
           disabled={!cycle || loading}
-          className="px-5 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700"
+          className="flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700"
         >
+          <Power size={18} />
           Toggle Applications
         </button>
 
         <button
           onClick={handleRun}
-          disabled={!cycle || cycle?.applicationOpen}
-          className={`px-5 py-2 rounded-lg text-white ${
-            !cycle || cycle?.applicationOpen
-              ? "bg-gray-400"
-              : "bg-purple-600 hover:bg-purple-700"
-          }`}
+          disabled={!cycle || loading}
+          className="flex items-center justify-center gap-2 bg-purple-600 text-white py-3 rounded-xl hover:bg-purple-700"
         >
+          <Shuffle size={18} />
           Run Allotment
         </button>
 
         <button
           onClick={handleForceClose}
-          className="px-5 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700"
+          disabled={loading}
+          className="flex items-center justify-center gap-2 bg-red-600 text-white py-3 rounded-xl hover:bg-red-700"
         >
+          <XCircle size={18} />
           Force Close
         </button>
 
       </div>
 
-      {/* TABLE */}
+      {/* Summary */}
+      <div className="bg-white rounded-2xl shadow p-6">
+        <h3 className="text-lg font-semibold mb-4">
+          Allotment Summary
+        </h3>
+
+        <div className="grid md:grid-cols-2 gap-4">
+
+          <div className="bg-gray-50 p-4 rounded-xl">
+            Total Allotted Students:
+            <span className="font-bold ml-2 text-indigo-600">
+              {data.length}
+            </span>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-xl">
+            Current Cycle:
+            <span className="font-bold ml-2">
+              {cycle?.name || "--"}
+            </span>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Students */}
       <div className="bg-white rounded-2xl shadow overflow-hidden">
 
         <div className="p-6 border-b">
-          <h3 className="text-lg font-semibold">Allotted Students</h3>
+          <h3 className="text-lg font-semibold">
+            Allotted Students
+          </h3>
         </div>
 
         {data.length === 0 ? (
-          <p className="p-6 text-gray-500">No allotments yet</p>
+          <p className="p-6 text-gray-500">
+            No allotments yet
+          </p>
         ) : (
           <div className="divide-y">
+
             {data.map((app) => (
               <div
                 key={app._id}
-                className="p-4 flex justify-between items-center hover:bg-gray-50 transition"
+                className="p-4 flex justify-between items-center hover:bg-gray-50"
               >
+
                 <div>
                   <p className="font-medium">
                     {app.studentId?.userId?.fullName}
                   </p>
+
                   <p className="text-sm text-gray-500">
                     {app.allottedHostel?.name}
                   </p>
                 </div>
 
-                <span className="text-sm text-gray-400">
+                <div className="flex items-center gap-2 text-indigo-600 font-medium">
+                  <BedDouble size={18} />
                   Room {app.roomId?.roomNumber || "--"}
-                </span>
+                </div>
+
               </div>
             ))}
+
           </div>
         )}
 

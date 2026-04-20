@@ -16,21 +16,40 @@ const requireStudent = asyncHandler(async (req, res, next) => {
   next();
 })
 
-const requireStaff = asyncHandler(async (req, res, next) => {
-  if (!req.user || req.user.role !== "staff") {
-    throw new ApiError(403, "Staff access required");
+// const requireStaff = asyncHandler(async (req, res, next) => {
+//   if (!req.user || req.user.role !== "staff") {
+//     throw new ApiError(403, "Staff access required");
+//   }
+
+//   const staff = await Staff.findOne({ userId: req.user._id });
+
+//   if (!staff) {
+//     throw new ApiError(403, "Staff record not found");
+//   }
+
+//   req.staff = staff;
+//   next();
+// });
+
+const requireStaff = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      message: "Unauthorized"
+    });
   }
 
-  const staff = await Staff.findOne({ userId: req.user._id });
-
-  if (!staff) {
-    throw new ApiError(403, "Staff record not found");
+  if (
+    req.user.role !== "warden" &&
+    req.user.role !== "staff" &&
+    req.user.role !== "admin"
+  ) {
+    return res.status(403).json({
+      message: "Access denied"
+    });
   }
 
-  req.staff = staff;
   next();
-});
-
+};
 export {
   requireAdmin,
   requireStudent,

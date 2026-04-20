@@ -5,8 +5,8 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import mongoSanitize from "express-mongo-sanitize";
-import rateLimit from "express-rate-limit";
-import xss from "xss-clean";
+// import rateLimit from "express-rate-limit";
+// import xss from "xss-clean";
 import helmet from "helmet";
 
 const app = express();
@@ -28,7 +28,7 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 
 //  SECURITY MIDDLEWARES (IMPORTANT ORDER)
 app.use(mongoSanitize()); // NoSQL injection protection
-app.use(xss());           // XSS protection
+// app.use(xss());           // XSS protection
 
 app.use(cookieParser());
 app.use(express.static("public"));

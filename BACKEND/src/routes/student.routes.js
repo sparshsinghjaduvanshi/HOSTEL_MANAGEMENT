@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
+import { authorizeRoles } from "../middlewares/authorizeRoles.js";
 
 import {
   getMyProfile,
@@ -10,7 +11,8 @@ import {
   createRoomChangeRequest,
   respondToRoomChange,
   getMyRoomChangeRequests,
-  cancelRoomChange
+  cancelRoomChange,
+  updateProfilePhoto
 } from "../controllers/student.controller.js";
 
 import { createComplaint, getMyComplaints, deleteComplaint } from "../controllers/maintenance.controller.js";
@@ -28,6 +30,7 @@ studentRouter.get("/profile", getMyProfile);
 
 // Update profile
 studentRouter.patch("/profile", updateProfile);
+studentRouter.patch("/photo",  authorizeRoles("student"), upload.single("photo"), updateProfilePhoto);
 
 
 // ================= DOCUMENT =================

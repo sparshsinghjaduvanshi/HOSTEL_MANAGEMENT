@@ -11,7 +11,9 @@ import {
   createStaff,
   updateStaff,
   updateStaffPhoto,
-  forceCloseCycle
+  forceCloseCycle,
+  deleteStaff,
+  getStudentDocuments
 } from "../controllers/admin.controller.js";
 
 import {
@@ -26,6 +28,7 @@ import { deleteUser } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { requireAdmin } from "../middlewares/roles.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
+import {authorizeRoles} from "../middlewares/authorizeRoles.js"
 
 const adminRouter = express.Router();
 
@@ -44,13 +47,14 @@ adminRouter.get("/dashboard", getAdminDashboard);
  * STUDENTS + STAFF
  */
 adminRouter.get("/students", getAllStudentsAdmin);
+adminRouter.delete("/users/:id", authorizeRoles("admin"), deleteUser);
 
 adminRouter.get("/staff", getAllStaff);
 adminRouter.post("/staff", createStaff);
 adminRouter.put("/staff/:id", updateStaff);
-adminRouter.delete("/users/:id", deleteUser);
-adminRouter.patch("/photo", upload.single("photo"), updateStaffPhoto);
-
+adminRouter.delete("/staff/:id", deleteStaff);
+adminRouter.patch("/staff/:id/photo", upload.single("photo"), updateStaffPhoto);
+adminRouter.get("/students/:id/documents", getStudentDocuments);
 /**
  * APPLICATION MANAGEMENT
  */
