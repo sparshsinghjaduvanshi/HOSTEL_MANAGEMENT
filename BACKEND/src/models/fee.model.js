@@ -28,6 +28,23 @@ const feeSchema = new Schema(
       enum: ["pending", "paid", "overdue"],
       default: "pending",
     },
+
+    receiptUrl: {
+      type: String
+    },
+
+    transactionId: {
+      type: String
+    },
+
+    verifiedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User"
+    },
+
+    verifiedAt: Date,
+
+    remarks: String
   },
   {
     timestamps: true,

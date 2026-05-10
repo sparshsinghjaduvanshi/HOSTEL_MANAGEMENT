@@ -14,6 +14,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { uploadOnCLoudinary } from "../utils/cloudinary.js";
+import { createNotification }
+  from "../utils/createNotification.js";
 
 
 // ================= HELPERS =================
@@ -388,20 +390,147 @@ const closeCycle = asyncHandler(async (req, res) => {
 });
 
 
+// const forceCloseCycle = asyncHandler(async (req, res) => {
+//   requireAdmin(req);
+
+//   const cycle = await AllotmentCycle.findOne({ status: "open" });
+//   if (!cycle) throw new ApiError(404, "No active cycle");
+
+//   cycle.status = "closed";
+//   cycle.applicationOpen = false;
+//   cycle.reAllotmentOpen = false;
+
+//   await cycle.save();
+
+//   return res.status(200).json(
+//     new ApiResponse(200, {}, "Cycle force closed")
+//   );
+// });
+
 const forceCloseCycle = asyncHandler(async (req, res) => {
+
   requireAdmin(req);
 
-  const cycle = await AllotmentCycle.findOne({ status: "open" });
-  if (!cycle) throw new ApiError(404, "No active cycle");
+  const cycle = await AllotmentCycle.findOne({
+    status: "open"
+  });
+
+  if (!cycle) {
+    throw new ApiError(404, "No active cycle");
+  }
+
+  // =========================
+  // CHECK IF ALLOTMENT ALREADY HAPPENED
+  // =========================
+
+  const allottedApplications = await Application.find({
+    cycleId: cycle._id,
+    isAllotted: true,
+  });
+
+  // =========================
+  // CLOSE CYCLE
+  // =========================
 
   cycle.status = "closed";
+
   cycle.applicationOpen = false;
+
   cycle.reAllotmentOpen = false;
 
   await cycle.save();
 
+  // =========================
+  // IF NO ALLOTMENT HAPPENED
+  // CANCEL APPLICATIONS
+  // =========================
+
+  if (allottedApplications.length === 0) {
+
+    const applications = await Application.find({
+      cycleId: cycle._id,
+      isAllotted: false,
+    });
+
+    for (const app of applications) {
+
+      app.allocationStatus = "cancelled";
+
+      await app.save();
+
+      // =========================
+      // SEND NOTIFICATION
+      // =========================
+
+      const student = await Student.findById(
+        app.studentId
+      );
+
+      if (!student) continue;
+
+      const user = await User.findById(
+        student.userId
+      );
+
+      if (!user) continue;
+
+      await createNotification({
+
+        userId: user._id,
+
+        title: "Allotment Cycle Cancelled",
+
+        message:
+          "The current hostel allotment cycle has been cancelled. Please re-apply when applications reopen.",
+
+        type: "reminder",
+      });
+
+      // =========================
+      // OPTIONAL EMAIL
+      // =========================
+
+      await sendEmail({
+
+        to: user.email,
+
+        subject: "Hostel Allotment Cycle Cancelled",
+
+        html: `
+          <h2>Hostel Allotment Cancelled</h2>
+
+          <p>
+            The current hostel allotment cycle has been cancelled by administration.
+          </p>
+
+          <p>
+            Please apply again once applications reopen.
+          </p>
+        `,
+      });
+    }
+
+    return res.status(200).json(
+
+      new ApiResponse(
+        200,
+        {},
+        "Cycle closed and applications cancelled successfully"
+      )
+    );
+  }
+
+  // =========================
+  // NORMAL CYCLE CLOSURE
+  // =========================
+
   return res.status(200).json(
-    new ApiResponse(200, {}, "Cycle force closed")
+
+    new ApiResponse(
+      200,
+      {},
+      "Cycle closed successfully"
+    )
   );
 });
 

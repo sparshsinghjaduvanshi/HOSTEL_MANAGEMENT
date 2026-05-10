@@ -38,7 +38,16 @@ API.interceptors.response.use(
     }
 
     if (status === 403) {
-      alert("You are not authorized");
+
+      console.log(
+        "403 ERROR:",
+        err.response?.data
+      );
+
+      alert(
+        err.response?.data?.message ||
+        "You are not authorized"
+      );
     }
 
     return Promise.reject(err);

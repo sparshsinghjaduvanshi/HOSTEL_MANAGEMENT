@@ -54,7 +54,9 @@ import studentRouter from "./routes/student.routes.js";
 import logRouter from "./routes/log.routes.js";
 import hostelRoutes from "./routes/hostel.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
-
+import staffRouter from "./routes/staff.routes.js";
+import paymentRouter
+from "./routes/payment.routes.js";
 // app.use("/api/v1/users", authLimiter);
 // app.use("/api/v1/users/send-otp", authLimiter);
 
@@ -67,6 +69,8 @@ app.use("/api/v1/students", studentRouter);
 app.use("/api/v1/logs", logRouter);
 app.use("/api/v1/hostels", hostelRoutes);
 app.use("/api/v1/notifications", notificationRouter);
+app.use("/api/v1/staff", staffRouter);
+app.use("/api/v1/payments", paymentRouter);
 
 app.get("/", (req, res) => {
   res.send("ROOT WORKING");

@@ -11,7 +11,8 @@ import {
   Bed,
   AlertCircle,
   Bell,
-  LogOut
+  LogOut,
+  CreditCard
 } from "lucide-react";
 
 const navItems = [
@@ -24,6 +25,7 @@ const navItems = [
   { name: "Allotment", path: "/student/allotment", icon: Bed },
   { name: "Complaints", path: "/student/complaints", icon: AlertCircle },
   { name: "Notifications", path: "/student/notifications", icon: Bell },
+  { name: "Payments", path: "/student/payments", icon: CreditCard }
 ];
 
 const Sidebar = () => {

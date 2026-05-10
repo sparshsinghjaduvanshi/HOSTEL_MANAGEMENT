@@ -4,54 +4,77 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 const requireAdmin = asyncHandler(async (req, res, next) => {
   if (!req.user || req.user.role !== "admin") {
-    throw new ApiError(403, "Adminn access required")
+    throw new ApiError(403, "Admin access required");
   }
-  next()
-})
+
+  next();
+});
 
 const requireStudent = asyncHandler(async (req, res, next) => {
   if (!req.user || req.user.role !== "student") {
     throw new ApiError(403, "Student access required");
   }
+
   next();
-})
+});
 
 // const requireStaff = asyncHandler(async (req, res, next) => {
 //   if (!req.user || req.user.role !== "staff") {
 //     throw new ApiError(403, "Staff access required");
 //   }
 
-//   const staff = await Staff.findOne({ userId: req.user._id });
+//   const staff = await Staff.findOne({
+//     userId: req.user._id
+//   });
 
 //   if (!staff) {
 //     throw new ApiError(403, "Staff record not found");
 //   }
 
 //   req.staff = staff;
+
 //   next();
 // });
 
-const requireStaff = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({
-      message: "Unauthorized"
-    });
-  }
+const requireStaff = asyncHandler(
+  async (req, res, next) => {
 
-  if (
-    req.user.role !== "warden" &&
-    req.user.role !== "staff" &&
-    req.user.role !== "admin"
-  ) {
-    return res.status(403).json({
-      message: "Access denied"
-    });
-  }
+    if (!req.user) {
+      throw new ApiError(
+        401,
+        "Unauthorized"
+      );
+    }
 
-  next();
-};
+    if (
+      req.user.role !== "staff" &&
+      req.user.role !== "warden" &&
+      req.user.role !== "admin"
+    ) {
+      throw new ApiError(
+        403,
+        "Staff access required"
+      );
+    }
+
+    const staff = await Staff.findOne({
+      userId: req.user._id,
+    });
+
+    if (!staff) {
+      throw new ApiError(
+        404,
+        "Staff record not found"
+      );
+    }
+
+    req.staff = staff;
+
+    next();
+  }
+);
 export {
   requireAdmin,
   requireStudent,
   requireStaff
-}
+};

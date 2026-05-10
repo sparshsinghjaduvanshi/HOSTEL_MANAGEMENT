@@ -4,7 +4,7 @@ import { Student } from "../models/student.model.js";
 import { Hostel } from "../models/hostel.model.js";
 import { Document } from "../models/document.model.js";
 import { Staff } from "../models/staff.model.js";
-import { Allotement } from "../models/allotement.model.js";
+import { Allotment } from "../models/allotement.model.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { createLog } from "../services/log.service.js";
 import { assignRoomToStudent } from "../services/room.service.js";
@@ -15,6 +15,8 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js"
 import { getAcademicYear } from "../utils/academicYear.js";
 import { Room } from "../models/room.model.js"
+import { createNotification } from "../utils/createNotification.js";
+import { Fee } from "../models/fee.model.js";
 
 
 // 1. Apply for hostels
@@ -64,18 +66,39 @@ const applyForHostel = asyncHandler(async (req, res) => {
 
   //  6. Prevent duplicate application
   const existing = await Application.findOne({
+
     studentId: student._id,
-    cycleId: cycle._id
+
+    cycleId: cycle._id,
+
+    allocationStatus: {
+      $nin: ["cancelled"]
+    },
+
+    "wardenDecision.status": {
+      $ne: "rejected"
+    }
   });
 
   if (existing) {
+
     await createLog(req, {
+
       userId: req.user._id,
+
       action: "CREATE",
+
       targetTable: "Application",
-      newData: { status: "DUPLICATE_ATTEMPT" }
+
+      newData: {
+        status: "DUPLICATE_ATTEMPT"
+      }
     });
-    throw new ApiError(400, "You have already applied in this cycle");
+
+    throw new ApiError(
+      400,
+      "You have already applied in this cycle"
+    );
   }
 
   //  7. Fetch student documents (ONLY for validation)
@@ -183,12 +206,6 @@ const startAllotment = asyncHandler(async (req, res) => {
       { $set: { isDocumentUploadAllowed: true } }
     );
 
-    return res.status(200).json({
-      success: true,
-      message: "Student permission updated successfully",
-      data: result
-    });
-
   } catch (error) {
     throw new ApiError(400, "Student permission not changed");
   }
@@ -207,14 +224,12 @@ const runAllotment = asyncHandler(async (req, res) => {
   });
 
   if (!cycle) {
-    throw new ApiError(404, "No active cycle found");
+    throw new ApiError(
+      404,
+      "No active cycle found"
+    );
   }
 
-  if (cycle.status !== "open") {
-    throw new ApiError(400, "Cycle is not active");
-  }
-
-  //  ensure applications are closed
   if (cycle.applicationOpen) {
     throw new ApiError(
       400,
@@ -222,55 +237,206 @@ const runAllotment = asyncHandler(async (req, res) => {
     );
   }
 
-  const applications = await Application.find({
-    cycleId: cycle._id,
-    "wardenDecision.status": "approved",
-    isAllotted: false,
-  })
-    .populate("preferences")
-    .sort({ priorityScore: -1 });
+  const applications =
+    await Application.find({
+
+      cycleId: cycle._id,
+
+      "wardenDecision.status":
+        "approved",
+
+      allocationStatus: {
+        $in: ["pending", "waitlisted"]
+      }
+
+    })
+      .populate("preferences")
+      .sort({ priorityScore: -1 });
 
   if (applications.length === 0) {
-    throw new ApiError(400, "No approved applications available for allotment");
+    return res.status(200).json({
+
+      success: true,
+
+      message:
+        "No pending approved applications left for allotment"
+    });
   }
 
   for (const app of applications) {
+
     let allocated = false;
 
-    for (const hostelId of app.preferences) {
-      const room = await Room.findOne({
-        hostelId,
-        $expr: { $lt: ["$occupiedCount", "$capacity"] }
-      });
+    for (const hostel of app.preferences) {
+      console.log(
+        "HOSTEL ID:",
+        hostel._id
+      );
+
+      console.log(
+        "HOSTEL TYPE:",
+        typeof hostel._id
+      );
+      const room =
+        await Room.findOne({
+
+          hostelId: hostel._id,
+
+          $expr: {
+            $lt: [
+              "$occupiedCount",
+              "$capacity"
+            ]
+          }
+        });
 
       if (room) {
+
         room.occupiedCount += 1;
+
         await room.save();
 
         app.isAllotted = true;
-        app.allottedHostel = hostelId;
+
+        app.allottedHostel =
+          hostel._id;
+
         app.roomId = room._id;
-        app.allocationStatus = "allotted";
+
+        app.allocationStatus =
+          "allotted";
+
         await app.save();
+        console.log(
+          "FOUND ROOM:",
+          room
+        );
+        const allotment = await Allotment.create({
+
+          studentId: app.studentId,
+
+          applicationId: app._id,
+
+          cycleId: cycle._id,
+
+          hostelId: hostel._id,
+
+          roomId: room._id,
+
+          paymentDeadline:
+            new Date(
+              Date.now() +
+              7 * 24 * 60 * 60 * 1000
+            )
+        });
+
+        await Fee.create({
+
+          allotmentId:
+            allotment._id,
+
+          amount: 42000,
+
+          dueDate:
+            allotment.paymentDeadline,
+
+          status: "pending"
+        });
+
+        const student =
+          await Student.findById(
+            app.studentId
+          );
+
+        const user =
+          await User.findById(
+            student.userId
+          );
+
+        await createNotification({
+
+          userId: user._id,
+
+          title: "Hostel Allotted",
+
+          message:
+            `You have been allotted ${hostel.name}, Room ${room.roomNumber}.`,
+
+          type: "allotment",
+        });
+
+        await sendEmail({
+
+          to: user.email,
+
+          subject:
+            "Hostel Allotted",
+
+          html: `
+            <h2>
+              Hostel Allotted
+            </h2>
+
+            <p>
+              You have been allotted ${hostel.name}, Room ${room.roomNumber}.
+            </p>
+          `
+        });
 
         allocated = true;
+
         break;
       }
     }
 
     if (!allocated) {
-      app.allocationStatus = "waitlisted";
+
+      app.allocationStatus =
+        "waitlisted";
+
       await app.save();
     }
   }
 
-  //  CLOSE CYCLE
-  cycle.status = "closed";
+  // =========================
+  // CHECK WAITLIST
+  // =========================
+
+  const waitlistedCount =
+    await Application.countDocuments({
+
+      cycleId: cycle._id,
+
+      allocationStatus:
+        "waitlisted",
+
+      isAllotted: false,
+
+      "wardenDecision.status":
+        "approved"
+    });
+
+  if (waitlistedCount > 0) {
+
+    cycle.reAllotmentOpen = true;
+
+  } else {
+
+    cycle.status = "closed";
+
+    cycle.reAllotmentOpen = false;
+  }
+
   await cycle.save();
 
   return res.status(200).json({
+
     success: true,
-    message: "Allotment completed"
+
+    message:
+      waitlistedCount > 0
+        ? "Allotment completed. Some students are waitlisted."
+        : "Allotment completed successfully"
   });
 });
 
@@ -309,8 +475,19 @@ const getApplicationsForWarden = asyncHandler(async (req, res) => {
 const reviewApplication = asyncHandler(async (req, res) => {
   const { applicationId, action, remarks } = req.body;
 
-  if (req.staff.role !== "Warden") {
-    throw new ApiError(403, "Only warden allowed");
+  const isAdmin =
+    req.user.role === "admin";
+
+  const isWarden =
+    req.user.role === "staff" &&
+    req.staff?.role === "Warden";
+
+  if (!isAdmin && !isWarden) {
+
+    throw new ApiError(
+      403,
+      "Only admin or warden allowed"
+    );
   }
 
   // const staffId = req.user._id;
@@ -318,6 +495,7 @@ const reviewApplication = asyncHandler(async (req, res) => {
   if (!["approve", "reject"].includes(action)) {
     throw new ApiError(400, "Invalid action");
   }
+
 
   const application = await Application.findById(applicationId);
 
@@ -353,6 +531,25 @@ const reviewApplication = asyncHandler(async (req, res) => {
   const studentDoc = await Student.findById(application.studentId);
   const user = await User.findById(studentDoc.userId);
 
+  await createNotification({
+
+    userId: user._id,
+
+    title:
+      action === "approve"
+        ? "Application Approved"
+        : "Application Rejected",
+
+    message:
+      remarks ||
+      `Your hostel application has been ${application.wardenDecision.status}.`,
+
+    type:
+      action === "approve"
+        ? "allotment"
+        : "rejection",
+  });
+
   sendEmail({
     to: user.email,
     subject: "Application Status Update",
@@ -369,23 +566,51 @@ const reviewApplication = asyncHandler(async (req, res) => {
 });
 
 const getMyApplication = asyncHandler(async (req, res) => {
-  const student = await Student.findOne({ userId: req.user._id });
+
+  const student =
+    await Student.findOne({
+      userId: req.user._id
+    });
+
   if (!student) {
-    throw new ApiError(404, "Student not found");
+
+    throw new ApiError(
+      404,
+      "Student not found"
+    );
   }
-  const application = await Application.findOne({
-    studentId: student._id
-  })
-    .populate("preferences")
-    .populate("allottedHostel")
-    .populate("roomId");
+
+  // FETCH LATEST APPLICATION
+  // OF THIS STUDENT
+
+  const application =
+    await Application.findOne({
+
+      studentId: student._id
+
+    })
+      .sort({ createdAt: -1 })
+
+      .populate("preferences")
+
+      .populate("allottedHostel")
+
+      .populate("roomId");
 
   if (!application) {
-    throw new ApiError(404, "No application found");
+
+    return res.status(200).json({
+
+      success: true,
+
+      application: null
+    });
   }
 
   return res.status(200).json({
+
     success: true,
+
     application
   });
 });
@@ -412,15 +637,51 @@ const getAllApplications = asyncHandler(async (req, res) => {
 });
 
 const getAllottedStudents = asyncHandler(async (req, res) => {
-  const applications = await Application.find({
-    isAllotted: true
-  })
-    .populate("studentId")
-    .populate("allottedHostel")
-    .populate("roomId");
+
+  // =========================
+  // GET LATEST CYCLE
+  // =========================
+
+  const cycle =
+    await AllotmentCycle
+      .findOne()
+      .sort({ createdAt: -1 });
+
+  if (!cycle) {
+
+    throw new ApiError(
+      404,
+      "No allotment cycle found"
+    );
+  }
+
+  // =========================
+  // FETCH ONLY CURRENT
+  // CYCLE ALLOTMENTS
+  // =========================
+
+  const applications =
+    await Application.find({
+
+      cycleId: cycle._id,
+
+      isAllotted: true
+    })
+      .populate({
+        path: "studentId",
+        populate: {
+          path: "userId",
+          model: "User"
+        }
+      })
+      .populate("allottedHostel")
+      .populate("roomId")
+      .sort({ createdAt: -1 });
 
   return res.status(200).json({
+
     success: true,
+
     applications
   });
 });
@@ -451,7 +712,10 @@ const cancelApplication = asyncHandler(async (req, res) => {
   const oldData = application.toObject();
 
   //  Delete application
-  await application.deleteOne();
+  application.allocationStatus =
+    "cancelled";
+
+  await application.save();
 
   //  Logging
   await createLog(req, {
@@ -470,66 +734,153 @@ const cancelApplication = asyncHandler(async (req, res) => {
 
 const reAllotWaitlisted = asyncHandler(async (req, res) => {
 
-  //  Get last CLOSED cycle
-  const cycle = await AllotmentCycle.findOne({
-    status: "closed"
-  }).sort({ createdAt: -1 });
+  const cycle =
+    await AllotmentCycle.findOne({
+
+      status: "open",
+
+      reAllotmentOpen: true
+    });
 
   if (!cycle) {
-    throw new ApiError(404, "No completed cycle found");
+
+    throw new ApiError(
+      404,
+      "No active re-allotment cycle found"
+    );
   }
 
-  if (cycle.reAllotmentOpen) {
-    throw new ApiError(400, "Re-allotment already active");
+  const applications =
+    await Application.find({
+
+      cycleId: cycle._id,
+
+      allocationStatus:
+        "waitlisted"
+    })
+      .populate("preferences");
+
+  if (applications.length === 0) {
+
+    throw new ApiError(
+      400,
+      "No waitlisted students found"
+    );
   }
-
-  //  Open re-allot window
-  const now = new Date();
-
-  cycle.reAllotmentOpen = true;
-  cycle.reAllotmentStartDate = now;
-  cycle.reAllotmentEndDate = new Date(
-    now.getTime() + 15 * 24 * 60 * 60 * 1000
-  );
-
-  await cycle.save();
-
-  //  Only waitlisted from THIS cycle
-  const applications = await Application.find({
-    cycleId: cycle._id,
-    allocationStatus: "waitlisted"
-  }).populate("studentId");
 
   for (const app of applications) {
+
     let allocated = false;
 
-    for (const hostelId of app.preferences) {
-      const room = await Room.findOne({
-        hostelId,
-        $expr: { $lt: ["$occupiedCount", "$capacity"] }
-      });
+    for (const hostel of app.preferences) {
+      console.log(
+        "HOSTEL ID:",
+        hostel._id
+      );
+
+      console.log(
+        "HOSTEL TYPE:",
+        typeof hostel._id
+      );
+      const room =
+        await Room.findOne({
+
+          hostelId: hostel._id,
+
+          $expr: {
+            $lt: [
+              "$occupiedCount",
+              "$capacity"
+            ]
+          }
+        });
 
       if (room) {
+        console.log(
+          "FOUND ROOM:",
+          room
+        );
         room.occupiedCount += 1;
+
         await room.save();
 
         app.isAllotted = true;
-        app.allottedHostel = hostelId;
+
+        app.allottedHostel =
+          hostel._id;
+
         app.roomId = room._id;
-        app.allocationStatus = "allotted";
+
+        app.allocationStatus =
+          "allotted";
+
         await app.save();
 
+        const student =
+          await Student.findById(
+            app.studentId
+          );
+
+        const user =
+          await User.findById(
+            student.userId
+          );
+
+        await createNotification({
+
+          userId: user._id,
+
+          title:
+            "Hostel Allotted (Re-Allotment)",
+
+          message:
+            `You have been allotted ${hostel.name}, Room ${room.roomNumber}.`,
+
+          type: "allotment",
+        });
+
         allocated = true;
+
         break;
       }
     }
   }
 
+  // =========================
+  // CHECK REMAINING WAITLIST
+  // =========================
+
+  const stillWaitlisted =
+    await Application.countDocuments({
+
+      cycleId: cycle._id,
+
+      allocationStatus:
+        "waitlisted",
+
+      isAllotted: false,
+
+      "wardenDecision.status":
+        "approved"
+    });
+
+  if (stillWaitlisted === 0) {
+
+    cycle.reAllotmentOpen = false;
+
+    cycle.status = "closed";
+
+    await cycle.save();
+  }
+
   return res.status(200).json({
+
     success: true,
-    message: "Re-allotment started for 15 days",
-    cycleId: cycle._id,
-    endsAt: cycle.reAllotmentEndDate
+
+    message:
+      stillWaitlisted > 0
+        ? "Some students are still waitlisted"
+        : "Re-allotment completed successfully"
   });
 });
 

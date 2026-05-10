@@ -61,7 +61,10 @@ allotmentCycleSchema.index(
   { name: 1, academicYear: 1 },
 );
 
-export const AllotmentCycle = mongoose.model(
-  "AllotmentCycle",
-  allotmentCycleSchema
-);
+export const AllotmentCycle =
+  mongoose.models.AllotmentCycle ||
+
+  mongoose.model(
+    "AllotmentCycle",
+    allotmentCycleSchema
+  );

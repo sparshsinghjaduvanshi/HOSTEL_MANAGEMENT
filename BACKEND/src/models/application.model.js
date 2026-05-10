@@ -82,7 +82,13 @@ const applicationSchema = new Schema(
     },
     allocationStatus: {
       type: String,
-      enum: ["pending", "allotted", "waitlisted"],
+      enum: [
+        "pending",
+        "allotted",
+        "waitlisted",
+        "cancelled",
+        "rejected"
+      ],
       default: "pending",
       index: true
     }

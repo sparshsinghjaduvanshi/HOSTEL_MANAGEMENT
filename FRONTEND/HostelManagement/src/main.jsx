@@ -35,8 +35,20 @@ import Profile from "./pages/student/Profile.jsx";
 import MyRequests from "./pages/student/MyRequests.jsx";
 import Staff from "./pages/admin/Staff.jsx";
 
+
+// Staff Pages
+import StaffLayout from "./layouts/StaffLayout.jsx";
+import StaffDashboard from "./pages/staff/Dashboard.jsx";
+import StaffComplaints from "./pages/staff/Complaints.jsx";
+import StaffStudents from "./pages/staff/Students.jsx";
+import StaffApplications from "./pages/staff/Applications.jsx";
+import StaffRoomChanges from "./pages/staff/RoomChanges.jsx";
+import StaffProfile from "./pages/staff/Profile.jsx";
+import Payments from "./pages/student/Payments.jsx";
+
 //  Protected Route
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
+import ProtectedStaffRoute from "./routes/ProtectedStaffRoute.jsx";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -82,9 +94,26 @@ const router = createBrowserRouter(
         <Route path="notifications" element={<Notifications />} />
         <Route path="profile" element={<Profile />} />
         <Route path="my-requests" element={<MyRequests />} />
+        <Route path="payments" element={<Payments />} />
       </Route>
 
+      {/* Staff */}
+      <Route
+        path="staff"
+        element={
+          <StaffLayout />
+        }
+      >
+        <Route path="dashboard" element={<StaffDashboard />} />
+        <Route path="complaints" element={<StaffComplaints />} />
+        <Route path="students" element={<StaffStudents />} />
+        
+        <Route path="room-changes" element={<StaffRoomChanges />} />
+        <Route path="profile" element={<StaffProfile />} />
+      </Route>
     </Route>
+
+
   )
 );
 

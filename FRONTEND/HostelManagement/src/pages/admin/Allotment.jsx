@@ -4,7 +4,8 @@ import {
   getAllottedStudents,
   forceCloseCycle,
   runAllotment,
-  toggleApplicationWindow
+  toggleApplicationWindow,
+  reAllotWaitlisted
 } from "../../services/admin.service.js";
 
 import ADMIN_API from "../../services/admin.service.js";
@@ -106,6 +107,35 @@ const AdminAllotment = () => {
     }
   };
 
+  const handleRetry = async () => {
+
+    try {
+
+      setLoading(true);
+
+      const res =
+        await reAllotWaitlisted();
+
+      alert(
+        res.data.message
+      );
+
+      await fetchAllotted();
+
+    } catch (err) {
+
+      alert(
+        err.response?.data
+          ?.message ||
+        "Retry failed"
+      );
+
+    } finally {
+
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
 
@@ -194,6 +224,14 @@ const AdminAllotment = () => {
         >
           <Shuffle size={18} />
           Run Allotment
+        </button>
+
+        <button
+          onClick={handleRetry}
+          disabled={loading}
+          className="bg-yellow-600 hover:bg-yellow-700 text-white px-5 py-3 rounded-xl"
+        >
+          Re-Allot Waitlisted
         </button>
 
         <button

@@ -28,15 +28,16 @@ const allotmentSchema = new Schema(
       required: true,
     },
 
-    roomNumber: {
-      type: String,
-      required: true,
+    roomId: {
+      type: Schema.Types.ObjectId,
+      ref: "Room",
+      required: true
     },
 
     // 🟡 Payment + confirmation lifecycle
     status: {
       type: String,
-      enum: ["pending_payment", "confirmed", "cancelled"],
+      enum: ["pending_payment", "confirmed", "cancelled", "frozen"],
       default: "pending_payment",
       index: true
     },
@@ -65,7 +66,16 @@ const allotmentSchema = new Schema(
     cancelledAt: {
       type: Date,
     },
+    reportingDeadline: {
+      type: Date
+    },
 
+    isFrozenByAdmin: {
+      type: Boolean,
+      default: false
+    },
+
+    freezeReason: String
   },
   { timestamps: true }
 );
@@ -76,8 +86,8 @@ allotmentSchema.index(
 );
 
 allotmentSchema.index(
-  { hostelId: 1, roomNumber: 1, cycleId: 1 },
+  { hostelId: 1, roomId: 1, cycleId: 1 },
   { unique: false }
 );
 
-export const Allotement = mongoose.model("Allotement", allotmentSchema)
+export const Allotment = mongoose.model("Allotment", allotmentSchema)

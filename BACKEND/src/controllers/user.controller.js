@@ -9,6 +9,7 @@ import validator from "validator";
 import { User } from "../models/user.model.js";
 import { Student } from "../models/student.model.js";
 import { Admin } from "../models/admin.model.js";
+import { Staff } from "../models/staff.model.js";
 import { OTP } from "../models/otp.model.js";
 
 import { sendEmail } from "../utils/sendEmail.js";
@@ -208,11 +209,21 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     let roleData = null;
 
     if (user.role === "student") {
-        roleData = await Student.findOne({ userId: user._id });
+        roleData = await Student.findOne({
+            userId: user._id
+        });
     }
 
     if (user.role === "admin") {
-        roleData = await Admin.findOne({ userId: user._id });
+        roleData = await Admin.findOne({
+            userId: user._id
+        });
+    }
+
+    if (user.role === "staff") {
+        roleData = await Staff.findOne({
+            userId: user._id
+        });
     }
 
     return res.status(200).json(

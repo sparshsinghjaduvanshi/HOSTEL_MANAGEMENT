@@ -52,14 +52,28 @@ const AuthPage = () => {
           password: formData.password,
         });
 
-        const user = res.data.data.user;
+        const data =
+          res.data?.data || res.data;
 
-        // ✅ correct place
-        setUser(user);
+        const loggedInUser = {
+          ...data.user,
+          roleData: data.roleData,
+        };
 
-        if (user.role === "admin") {
+        setUser(loggedInUser);
+
+        if (loggedInUser.role === "admin") {
+
           navigate("/admin/dashboard");
+
+        } else if (
+          loggedInUser.role === "staff"
+        ) {
+
+          navigate("/staff/dashboard");
+
         } else {
+
           navigate("/student/dashboard");
         }
 

@@ -11,3 +11,10 @@ export const getMyApplication = () =>
 // Cancel
 export const cancelApplication = () =>
   API.delete("/applications/cancel");
+
+// Reallotment
+export const retryAllotment =
+  () =>
+    API.post(
+      "/application/allotment/retry"
+    );

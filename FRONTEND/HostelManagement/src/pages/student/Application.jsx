@@ -81,9 +81,7 @@ const Application = () => {
       const res = await getMyApplication();
 
       setApplication(
-        res.data.data ||
-          res.data.application ||
-          null
+        res.data.application || null
       );
     } catch {
       setApplication(null);
@@ -109,15 +107,39 @@ const Application = () => {
     }
   };
 
+  // useEffect(() => {
+  //   if (!user) return;
+
+  //   const init = async () => {
+  //     setLoading(true);
+
+  //     await fetchCycle();
+
+  //     if (user.roleData?.gender) {
+  //       await fetchHostels(
+  //         user.roleData.gender
+  //       );
+  //     }
+
+  //     await fetchApplication();
+
+  //     setLoading(false);
+  //   };
+
+  //   init();
+  // }, [user]);
+
+
   useEffect(() => {
     if (!user) return;
-
     const init = async () => {
+
       setLoading(true);
 
       await fetchCycle();
 
       if (user.roleData?.gender) {
+
         await fetchHostels(
           user.roleData.gender
         );
@@ -129,8 +151,20 @@ const Application = () => {
     };
 
     init();
-  }, [user]);
 
+    // AUTO REFRESH EVERY 5 SECONDS
+
+    const interval =
+      setInterval(() => {
+
+        fetchApplication();
+
+      }, 5000);
+
+    return () =>
+      clearInterval(interval);
+
+  }, [user]);
   /* ---------------------------------- */
   /* HOSTEL PREFS                       */
   /* ---------------------------------- */
@@ -221,7 +255,7 @@ const Application = () => {
       alert(
         err.response?.data
           ?.message ||
-          "Upload failed"
+        "Upload failed"
       );
     }
   };
@@ -290,7 +324,7 @@ const Application = () => {
       alert(
         err.response?.data
           ?.message ||
-          "Apply failed"
+        "Apply failed"
       );
     }
   };
@@ -304,6 +338,13 @@ const Application = () => {
       </p>
     );
   }
+
+  console.log("APPLICATION:", application);
+
+console.log(
+  "IS ALLOTTED:",
+  application?.isAllotted
+);
 
   return (
     <div className="space-y-8">
@@ -353,72 +394,139 @@ const Application = () => {
           </p>
 
           <p className="font-bold text-lg mt-1">
-            {application
-              ?.wardenDecision
-              ?.status ||
-              "Not Applied"}
+            {
+              application?.isAllotted
+                ? "Allotted"
+                : application?.allocationStatus === "waitlisted"
+                  ? "Waitlisted"
+                  : application?.allocationStatus === "cancelled"
+                    ? "Cancelled"
+                    : application?.wardenDecision?.status || "Not Applied"
+            }
           </p>
         </div>
 
       </div>
 
       {/* APPLIED */}
-      {application ? (
+     {/* APPLIED / ALLOTTED */}
+
+      {application?.isAllotted ? (
+
+        <div className="bg-white rounded-2xl shadow p-6 space-y-6">
+
+          <div className="flex items-center gap-3">
+
+            <CheckCircle className="text-green-600" />
+
+            <h3 className="text-2xl font-bold">
+              Hostel Allotted
+            </h3>
+
+          </div>
+
+          <p className="text-gray-600">
+            Congratulations! Your hostel has been allotted successfully.
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-4">
+
+            {/* HOSTEL */}
+
+            <div className="bg-blue-50 rounded-xl p-5">
+
+              <p className="text-sm text-gray-500">
+                Hostel
+              </p>
+
+              <p className="font-bold text-lg">
+                {
+                  application?.allottedHostel?.name
+                }
+              </p>
+
+            </div>
+
+            {/* ROOM */}
+
+            <div className="bg-green-50 rounded-xl p-5">
+
+              <p className="text-sm text-gray-500">
+                Room Number
+              </p>
+
+              <p className="font-bold text-lg">
+                {
+                  application?.roomId?.roomNumber
+                }
+              </p>
+
+            </div>
+
+          </div>
+
+          {/* INSTRUCTIONS */}
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+
+            <p className="font-semibold text-yellow-800">
+              Important Instructions
+            </p>
+
+            <ul className="list-disc ml-5 mt-2 text-sm text-gray-700 space-y-1">
+
+              <li>
+                Complete hostel fee payment before deadline.
+              </li>
+
+              <li>
+                Bring original documents during check-in.
+              </li>
+
+              <li>
+                Contact hostel office for room verification.
+              </li>
+
+            </ul>
+
+          </div>
+
+        </div>
+
+      ) : application ? (
+
         <div className="bg-white rounded-2xl shadow p-6 space-y-4">
 
           <div className="flex items-center gap-3">
+
             <CheckCircle className="text-green-600" />
 
             <h3 className="text-xl font-semibold">
               Application Submitted
             </h3>
+
           </div>
 
           <p className="text-gray-600">
+
             Status:{" "}
+
             <b>
-              {application
-                ?.wardenDecision
-                ?.status ||
-                "Pending"}
+
+              {
+                application?.allocationStatus === "waitlisted"
+                  ? "Waitlisted"
+                  : application?.allocationStatus === "cancelled"
+                    ? "Cancelled"
+                    : application?.wardenDecision?.status || "Pending"
+              }
+
             </b>
+
           </p>
 
-          {application.isAllotted && (
-            <div className="grid md:grid-cols-2 gap-4">
-
-              <div className="bg-blue-50 rounded-xl p-4">
-                <p className="text-sm text-gray-500">
-                  Hostel
-                </p>
-
-                <p className="font-semibold">
-                  {
-                    application
-                      ?.allottedHostel
-                      ?.name
-                  }
-                </p>
-              </div>
-
-              <div className="bg-green-50 rounded-xl p-4">
-                <p className="text-sm text-gray-500">
-                  Room
-                </p>
-
-                <p className="font-semibold">
-                  {
-                    application
-                      ?.roomId
-                      ?.roomNumber
-                  }
-                </p>
-              </div>
-
-            </div>
-          )}
-
         </div>
+
       ) : (
         <div className="bg-white rounded-2xl shadow p-6 space-y-6">
 
@@ -463,7 +571,7 @@ const Application = () => {
             </p>
 
             {preferences.length ===
-            0 ? (
+              0 ? (
               <p className="text-gray-500">
                 No hostels selected
               </p>
@@ -601,26 +709,26 @@ const Application = () => {
 
                   {doc.type ===
                     "address_proof" && (
-                    <input
-                      type="text"
-                      placeholder="Enter address"
-                      value={
-                        doc.address
-                      }
-                      onChange={(
-                        e
-                      ) =>
-                        handleDocChange(
-                          index,
-                          "address",
+                      <input
+                        type="text"
+                        placeholder="Enter address"
+                        value={
+                          doc.address
+                        }
+                        onChange={(
                           e
-                            .target
-                            .value
-                        )
-                      }
-                      className="w-full border rounded-xl px-4 py-2"
-                    />
-                  )}
+                        ) =>
+                          handleDocChange(
+                            index,
+                            "address",
+                            e
+                              .target
+                              .value
+                          )
+                        }
+                        className="w-full border rounded-xl px-4 py-2"
+                      />
+                    )}
                 </div>
               )
             )}

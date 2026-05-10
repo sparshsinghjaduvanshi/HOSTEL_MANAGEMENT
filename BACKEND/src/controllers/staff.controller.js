@@ -1,12 +1,12 @@
 import mongoose from "mongoose";
 import validator from "validator";
-
-import { Maintenance } from "../models/maintenance.model.js";
+import { Complaint } from "../models/maintenance.model.js";
+// import { Complaint } from "../models/Complaint.model.js";
 import { roleToCategoryMap } from "../utils/roleCategoryMap.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { User } from "../models/user.model.js";
 import { Application } from "../models/application.model.js";
-import { AllotmentCycle } from "../models/allotementCycle.model.js";
+import { AllotmentCycle } from "../models/AllotementCycle.model.js";
 import { Room } from "../models/room.model.js";
 import { RoomChangeRequest } from "../models/roomChangeRequest.model.js";
 import { Student } from "../models/student.model.js";
@@ -48,7 +48,7 @@ const getMyComplaints = asyncHandler(async (req, res) => {
     filter.category = category;
   }
 
-  const complaints = await Maintenance.find(filter)
+  const complaints = await Complaint.find(filter)
     .populate("roomId")
     .populate({
       path: "reportedBy",
@@ -77,7 +77,7 @@ const updateComplaintStatus = asyncHandler(async (req, res) => {
   const staff = req.staff;
   if (!staff) throw new ApiError(403, "Staff not found");
 
-  const complaint = await Maintenance.findById(id);
+  const complaint = await Complaint.findById(id);
   if (!complaint) throw new ApiError(404, "Complaint not found");
 
   if (complaint.hostelId.toString() !== staff.assignedHostelId.toString()) {
@@ -110,7 +110,7 @@ const updateComplaintStatus = asyncHandler(async (req, res) => {
   await createLog(req, {
     userId: req.user?._id,
     action: "UPDATE",
-    targetTable: "Maintenance",
+    targetTable: "Complaint",
     targetId: complaint._id,
     oldData: { status: oldStatus },
     newData: { status: complaint.status }
@@ -251,11 +251,37 @@ const decideRoomChange = asyncHandler(async (req, res) => {
 });
 
 
+const getRoomChangeRequests = asyncHandler(async (req, res) => {
+
+  const staff = req.staff;
+
+  if (!["CareTaker", "Warden"].includes(staff.role)) {
+    throw new ApiError(403, "Access denied");
+  }
+
+  const requests = await RoomChangeRequest.find()
+    .populate({
+      path: "requester",
+      populate: {
+        path: "userId",
+        select: "fullName email"
+      }
+    })
+    .populate("targetStudent")
+    .sort({ createdAt: -1 });
+
+  return res.status(200).json({
+    success: true,
+    requests
+  });
+});
+
 // ================= EXPORT =================
 
 export {
   getMyComplaints,
   updateComplaintStatus,
   getMyHostelStudents,
-  decideRoomChange
+  decideRoomChange,
+  getRoomChangeRequests
 };

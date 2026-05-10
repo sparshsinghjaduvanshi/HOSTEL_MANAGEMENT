@@ -5,7 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { createLog } from "../services/log.service.js";
-import {Student} from "../models/student.model.js"
+import { Student } from "../models/student.model.js"
 
 import { Complaint } from "../models/maintenance.model.js";
 
@@ -27,6 +27,18 @@ const createComplaint = asyncHandler(async (req, res) => {
 
   if (!title || !description) {
     throw new ApiError(400, "All fields required");
+  }
+
+  const application = await Application.findOne({
+      studentId: student._id,
+      isAllotted: true,
+    });
+
+  if (!application) {
+    throw new ApiError(
+      403,
+      "You are not allotted any hostel yet"
+    );
   }
 
   const complaint = await Complaint.create({
@@ -59,7 +71,7 @@ const getMyComplaints = asyncHandler(async (req, res) => {
     action: "VIEW",
     targetTable: "Complaint",
     newData: { count: complaints.length }
-  }).catch(() => {});
+  }).catch(() => { });
 
 
   return res.json(new ApiResponse(200, complaints));
@@ -100,7 +112,7 @@ const deleteComplaint = asyncHandler(async (req, res) => {
     action: "DELETE",
     targetTable: "Complaint",
     oldData
-  }).catch(() => {});
+  }).catch(() => { });
 
   return res.json(new ApiResponse(200, null, "Deleted successfully"));
 });
