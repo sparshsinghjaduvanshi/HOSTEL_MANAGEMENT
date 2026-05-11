@@ -6,9 +6,20 @@
   "author": "Sparsh Singh",
   "type": "module",
   "main": "index.js",
-  "scripts": {
-    "dev": "nodemon -r dotenv/config --experimental-json-modules src/index.js"
-  },
+ "scripts": {
+
+  "dev": "nodemon -r dotenv/config --experimental-json-modules src/index.js",
+
+  "start": "node -r dotenv/config src/index.js",
+
+  "pm2:start": "pm2 start ecosystem.config.cjs",
+
+  "pm2:stop": "pm2 delete all",
+
+  "pm2:logs": "pm2 logs",
+
+  "pm2:monit": "pm2 monit"
+},
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.9.0",

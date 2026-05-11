@@ -440,36 +440,48 @@ const runAllotment = asyncHandler(async (req, res) => {
   });
 });
 
-const getApplicationsForWarden = asyncHandler(async (req, res) => {
-  if (req.staff.role !== "Warden") {
-    throw new ApiError(403, "Only warden allowed");
-  }
+const getApplicationsForWarden =  asyncHandler(async (req, res) => {
+  console.log(req.user);
+console.log(req.staff);
+    if (
+      req.staff.role !== "Warden"
+    ) {
 
-  const staff = await Staff.findOne({ userId: req.user._id });
+      throw new ApiError(
+        403,
+        "Only warden allowed"
+      );
+    }
 
-  if (!staff) {
-    throw new ApiError(404, "Staff not found");
-  }
+    const applications =
+      await Application.find()
 
-  const applications = await Application.find({
-    preferences: { $in: [staff.assignedHostelId] },
-    "wardenDecision.status": "pending"
-  })
-    .populate("studentId")
-    .populate("preferences")
-    .sort({ createdAt: -1 });
+        .populate({
 
-  await createLog(req, {
-    userId: req.user._id,
-    action: "VIEW",
-    targetTable: "Application",
-    newData: { type: "WARDEN_PENDING_APPLICATIONS" }
-  });
+          path: "studentId",
 
-  return res.status(200).json({
-    success: true,
-    applications
-  });
+          populate: {
+
+            path: "userId",
+
+            model: "User"
+          }
+        })
+
+        .populate("preferences")
+
+        .populate("allottedHostel")
+
+        .populate("roomId")
+
+        .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+
+      success: true,
+
+      applications
+    });
 });
 
 const reviewApplication = asyncHandler(async (req, res) => {
@@ -920,6 +932,82 @@ const getDashboardStats = asyncHandler(async (req, res) => {
   });
 });
 
+const getApplicationDetailsForWarden = asyncHandler(async (req, res) => {
+
+  const { applicationId } =
+    req.params;
+
+  const staff =
+    await Staff.findOne({
+
+      userId:
+        req.user._id
+    });
+
+  if (
+    !staff ||
+    staff.role !== "Warden"
+  ) {
+
+    throw new ApiError(
+      403,
+      "Only warden allowed"
+    );
+  }
+
+  const application =
+    await Application.findById(
+      applicationId
+    )
+
+      .populate({
+
+        path: "studentId",
+
+        populate: {
+
+          path: "userId",
+
+          model: "User",
+
+          select:
+            "fullName email"
+        }
+      })
+
+      .populate("preferences")
+
+      .populate("allottedHostel")
+
+      .populate("roomId");
+
+  if (!application) {
+
+    throw new ApiError(
+      404,
+      "Application not found"
+    );
+  }
+
+  // GET DOCUMENTS
+
+  const documents =
+    await Document.find({
+
+      studentId:
+        application.studentId._id
+    });
+
+  return res.status(200).json({
+
+    success: true,
+
+    application,
+
+    documents
+  });
+});
+
 export {
   applyForHostel,
   startAllotment,
@@ -931,6 +1019,7 @@ export {
   cancelApplication,
   reAllotWaitlisted,
   getDashboardStats,
-  runAllotment
+  runAllotment,
+  getApplicationDetailsForWarden
 
 } 

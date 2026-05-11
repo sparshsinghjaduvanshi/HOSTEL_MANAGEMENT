@@ -45,6 +45,8 @@ import StaffApplications from "./pages/staff/Applications.jsx";
 import StaffRoomChanges from "./pages/staff/RoomChanges.jsx";
 import StaffProfile from "./pages/staff/Profile.jsx";
 import Payments from "./pages/student/Payments.jsx";
+import ApplicationDetails from "./pages/staff/ApplicationDetails.jsx";
+import StudentDetails from "./pages/staff/StudentDetails.jsx";
 
 //  Protected Route
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
@@ -110,6 +112,9 @@ const router = createBrowserRouter(
         
         <Route path="room-changes" element={<StaffRoomChanges />} />
         <Route path="profile" element={<StaffProfile />} />
+        <Route path="applications" element={<StaffApplications />} />
+        <Route path="application/:id" element={<ApplicationDetails />} />
+        <Route path="/staff/students/:id" element={<StudentDetails />}/>
       </Route>
     </Route>
 

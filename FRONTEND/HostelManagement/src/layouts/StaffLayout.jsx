@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import StaffSidebar from "../components/staff/StaffSidebar";
 import { useAuth } from "../context/AuthContext";
 
+
 const StaffLayout = () => {
   const { user } = useAuth();
 

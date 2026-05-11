@@ -14,7 +14,8 @@ import {
   getAllottedStudents,
   cancelApplication,
   reAllotWaitlisted,
-  getDashboardStats
+  getDashboardStats,
+  getApplicationDetailsForWarden
 } from "../controllers/application.controller.js";
 
 // (Assuming you have auth middleware)
@@ -52,6 +53,7 @@ applicationRouter.post("/allotment/retry", verifyJWT, authorizeRoles("admin"), r
 
 // Get all applications
 applicationRouter.get("/all", verifyJWT, authorizeRoles("admin"), getAllApplications);
+applicationRouter.get("/warden/details/:applicationId", verifyJWT, getApplicationDetailsForWarden);
 
 // Get allotted students
 applicationRouter.get("/allotted", verifyJWT, authorizeRoles("admin"), getAllottedStudents);

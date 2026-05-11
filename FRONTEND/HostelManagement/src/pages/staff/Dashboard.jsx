@@ -14,6 +14,9 @@ export default function Dashboard() {
 
   const [error, setError] =
     useState("");
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
 
   const fetchDashboard = async () => {
 
@@ -43,9 +46,7 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    fetchDashboard();
-  }, []);
+
 
   const stats = [
     {
@@ -204,10 +205,10 @@ export default function Dashboard() {
                   <td className="px-6 py-4">
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-semibold ${complaint.status === "resolved"
-                          ? "bg-green-100 text-green-700"
-                          : complaint.status === "in-progress"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
+                        ? "bg-green-100 text-green-700"
+                        : complaint.status === "in-progress"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-red-100 text-red-700"
                         }`}
                     >
                       {complaint.status}

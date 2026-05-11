@@ -5,7 +5,8 @@ import {
   updateComplaintStatus,
   getMyHostelStudents,
   decideRoomChange,
-  getRoomChangeRequests
+  getRoomChangeRequests,
+  getStudentDetailsForStaff
 } from "../controllers/staff.controller.js";
 
 import {
@@ -57,6 +58,11 @@ staffRouter.get(
 staffRouter.patch(
   "/room-changes/:id",
   decideRoomChange
+);
+
+staffRouter.get(
+  "/students/:id",
+  getStudentDetailsForStaff
 );
 
 export default staffRouter;

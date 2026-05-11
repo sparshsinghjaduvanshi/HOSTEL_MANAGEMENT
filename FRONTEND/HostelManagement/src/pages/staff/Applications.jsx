@@ -1,34 +1,84 @@
-export default function StaffApplications() {
+import {
+  useEffect,
+  useState
+} from "react";
 
-  const applications = [
-    {
-      id: 1,
-      student: "Rahul Sharma",
-      course: "B.Tech CSE",
-      year: "2nd Year",
-      hostelPreference: "Hostel A",
-      distance: "120 km",
-      status: "pending",
-    },
-    {
-      id: 2,
-      student: "Ankit Verma",
-      course: "MBA",
-      year: "1st Year",
-      hostelPreference: "Hostel B",
-      distance: "340 km",
-      status: "approved",
-    },
-    {
-      id: 3,
-      student: "Aman Gupta",
-      course: "B.Sc Physics",
-      year: "Final Year",
-      hostelPreference: "Hostel C",
-      distance: "50 km",
-      status: "rejected",
-    },
-  ];
+import {
+  useNavigate
+} from "react-router-dom";
+
+import {
+  getApplicationsForWarden,
+  reviewApplication
+} from "../../services/application.service.js";
+
+export default function StaffApplications() {
+  const [applications, setApplications] = useState([]);
+  const navigate = useNavigate();
+  useEffect(() => {
+    fetchApplications();
+
+  }, []);
+
+
+  const fetchApplications = async () => {
+
+    try {
+
+      const res =
+        await getApplicationsForWarden();
+
+      setApplications(
+        res.data.applications
+      );
+
+    } catch (err) {
+
+      console.log(err);
+    }
+  };
+  const handleReview = async (
+    applicationId,
+    action
+  ) => {
+
+    try {
+
+      await reviewApplication({
+
+        applicationId,
+
+        action,
+
+        remarks: ""
+      });
+
+      fetchApplications();
+
+    } catch (err) {
+
+      console.log(err);
+
+      alert(
+        "Action failed"
+      );
+    }
+  };
+
+  const totalApplications = applications.length;
+
+  const approvedApplications = applications.filter(
+    app =>
+      app.wardenDecision
+        ?.status === "approved"
+  ).length;
+
+  const pendingApplications = applications.filter(
+    app =>
+      app.wardenDecision
+        ?.status === "pending"
+  ).length;
+
 
   return (
     <div className="space-y-6">
@@ -61,7 +111,7 @@ export default function StaffApplications() {
           </p>
 
           <h2 className="text-3xl font-bold text-gray-800 mt-2">
-            150
+            {totalApplications}
           </h2>
         </div>
 
@@ -71,7 +121,7 @@ export default function StaffApplications() {
           </p>
 
           <h2 className="text-3xl font-bold text-green-600 mt-2">
-            100
+            {approvedApplications}
           </h2>
         </div>
 
@@ -81,7 +131,7 @@ export default function StaffApplications() {
           </p>
 
           <h2 className="text-3xl font-bold text-yellow-500 mt-2">
-            50
+            {pendingApplications}
           </h2>
         </div>
 
@@ -141,63 +191,114 @@ export default function StaffApplications() {
 
                   {/* Student */}
                   <td className="px-6 py-4 font-semibold text-gray-800">
-                    {application.student}
+                    {
+                      application.studentId
+                        ?.userId?.fullName
+                    }
                   </td>
 
                   {/* Course */}
                   <td className="px-6 py-4 text-gray-700">
-                    {application.course}
+                    {
+                      application.studentId
+                        ?.course
+                    }
                   </td>
 
                   {/* Year */}
                   <td className="px-6 py-4 text-gray-700">
-                    {application.year}
+                    {
+                      application.studentId
+                        ?.year
+                    }
                   </td>
 
                   {/* Preference */}
                   <td className="px-6 py-4 text-gray-700">
-                    {application.hostelPreference}
+                    {
+                      application.preferences?.[0]
+                        ?.name
+                    }
                   </td>
 
                   {/* Distance */}
                   <td className="px-6 py-4 text-gray-700">
-                    {application.distance}
+                    {
+                      application.distance
+                    } km
                   </td>
 
                   {/* Status */}
                   <td className="px-6 py-4">
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        application.status === "approved"
-                          ? "bg-green-100 text-green-700"
-                          : application.status === "pending"
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${application.status === "approved"
+                        ? "bg-green-100 text-green-700"
+                        : application.wardenDecision
+                          ?.status === "pending"
                           ? "bg-yellow-100 text-yellow-700"
                           : "bg-red-100 text-red-700"
-                      }`}
+                        }`}
                     >
-                      {application.status}
+                      {application.wardenDecision
+                        ?.status}
                     </span>
                   </td>
 
                   {/* Actions */}
+
                   <td className="px-6 py-4">
+
                     <div className="flex gap-2 flex-wrap">
 
-                      <button className="px-3 py-1 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600 transition-all">
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/staff/application/${application._id}`
+                          )
+                        }
+                        className="px-3 py-1 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600 transition-all"
+                      >
                         View
                       </button>
 
-                      <button className="px-3 py-1 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700 transition-all">
-                        Approve
-                      </button>
+                      {
+                        application
+                          .wardenDecision
+                          ?.status === "pending" && (
 
-                      <button className="px-3 py-1 rounded-lg bg-red-500 text-white text-sm hover:bg-red-600 transition-all">
-                        Reject
-                      </button>
+                          <>
+
+                            <button
+                              onClick={() =>
+                                handleReview(
+                                  application._id,
+                                  "approve"
+                                )
+                              }
+                              className="px-3 py-1 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700 transition-all"
+                            >
+                              Approve
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                handleReview(
+                                  application._id,
+                                  "reject"
+                                )
+                              }
+                              className="px-3 py-1 rounded-lg bg-red-500 text-white text-sm hover:bg-red-600 transition-all"
+                            >
+                              Reject
+                            </button>
+
+                          </>
+                        )
+                      }
 
                     </div>
-                  </td>
 
+                  </td>
                 </tr>
               ))}
 

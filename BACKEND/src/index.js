@@ -1,13 +1,15 @@
 import dotenv from "dotenv";
-import mongoose from "mongoose";
-import {app} from "./app.js";
-import "./cron/reallotment.cron.js";
 
 // Load environment variables
-dotenv.config();
+dotenv.config({
+  path: "./.env"
+});
+import "./cron/reallotment.cron.js";
+import mongoose from "mongoose";
+import {app} from "./app.js";
 
 // Port
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8000;
 
 // MongoDB Connection
 const connectDB = async () => {
@@ -26,5 +28,10 @@ const connectDB = async () => {
     process.exit(1);
   }
 };
+
+console.log(
+  `Server running:
+   ${process.pid}`
+);
 
 connectDB();

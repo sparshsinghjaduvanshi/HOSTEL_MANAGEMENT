@@ -50,3 +50,11 @@ export const decideRoomChange = (
     action,
     newRoomId,
   });
+
+export const getStudentDetails =
+  (id) => {
+
+    return API.get(
+      `/staff/students/${id}`
+    );
+};

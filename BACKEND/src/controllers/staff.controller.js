@@ -127,36 +127,126 @@ const updateComplaintStatus = asyncHandler(async (req, res) => {
 // ================= HOSTEL STUDENTS =================
 
 const getMyHostelStudents = asyncHandler(async (req, res) => {
-  const staff = req.staff;
 
-  if (!["CareTaker", "Warden"].includes(staff.role)) {
-    throw new ApiError(403, "Access denied");
-  }
+    const staff = req.staff;
 
-  const cycle = await AllotmentCycle.findOne({
-    status: { $in: ["active", "closed"] }
-  }).sort({ createdAt: -1 });
+    if (
+      !["CareTaker", "Warden"]
+        .includes(staff.role)
+    ) {
 
-  if (!cycle) throw new ApiError(404, "No cycle found");
+      throw new ApiError(
+        403,
+        "Access denied"
+      );
+    }
 
-  const applications = await Application.find({
-    cycleId: cycle._id,
-    isAllotted: true,
-    allottedHostel: staff.assignedHostelId
-  })
-    .populate({
-      path: "studentId",
-      populate: { path: "userId", select: "fullName email" }
-    })
-    .populate("roomId");
+    let filter = {
 
-  return res.status(200).json({
-    success: true,
-    total: applications.length,
-    students: applications
-  });
+      isAllotted: true
+    };
+
+    // =========================
+    // CARETAKER:
+    // ONLY OWN HOSTEL
+    // =========================
+
+    if (
+      staff.role === "CareTaker"
+    ) {
+
+      filter.allottedHostel =
+        staff.assignedHostelId;
+    }
+
+    // =========================
+    // FETCH STUDENTS
+    // =========================
+
+    const applications =
+      await Application.find(filter)
+
+        .populate({
+
+          path: "studentId",
+
+          populate: {
+
+            path: "userId",
+
+            select:
+              "fullName email"
+          }
+        })
+
+        .populate("roomId")
+
+        .populate(
+          "allottedHostel"
+        )
+
+        .sort({
+          createdAt: -1
+        });
+
+    return res.status(200).json({
+
+      success: true,
+
+      total:
+        applications.length,
+
+      students:
+        applications
+    });
 });
 
+const getStudentDetailsForStaff = asyncHandler(async (req, res) => {
+
+    const { id } = req.params;
+
+    const student =
+      await Student.findById(id)
+
+        .populate({
+
+          path: "userId",
+
+          select:
+            "fullName email"
+        });
+
+    if (!student) {
+
+      throw new ApiError(
+        404,
+        "Student not found"
+      );
+    }
+
+    const application =
+      await Application.findOne({
+
+        studentId: student._id,
+
+        isAllotted: true
+      })
+
+        .populate("roomId")
+
+        .populate(
+          "allottedHostel"
+        );
+
+    return res.status(200).json({
+
+      success: true,
+
+      student,
+
+      application
+    });
+});
 
 // ================= ROOM CHANGE =================
 
@@ -283,5 +373,6 @@ export {
   updateComplaintStatus,
   getMyHostelStudents,
   decideRoomChange,
-  getRoomChangeRequests
+  getRoomChangeRequests,
+  getStudentDetailsForStaff
 };
