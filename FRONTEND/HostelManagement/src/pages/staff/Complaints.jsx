@@ -1,18 +1,11 @@
 import { useEffect, useState } from "react";
-
-import {
-  getStaffComplaints,
-  updateComplaintStatus,
-} from "../../services/staff.service";
+import { getMyComplaints, updateComplaintStatus,} from "../../services/staff.service";
 
 export default function StaffComplaints() {
 
   const [selectedStatus, setSelectedStatus] = useState("all");
-
   const [complaints, setComplaints] = useState([]);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
 
   const fetchComplaints = async () => {
@@ -22,7 +15,7 @@ export default function StaffComplaints() {
       setLoading(true);
 
       const res =
-        await getStaffComplaints();
+        await getMyComplaints();
 
       setComplaints(
         res.data.complaints || []

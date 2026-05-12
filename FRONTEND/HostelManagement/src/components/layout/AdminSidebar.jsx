@@ -7,7 +7,10 @@ import {
   Users,
   Building,
   LogOut,
-  UserCheck
+  UserCheck,
+  CreditCard,
+  ScrollText,
+  ClipboardList
 } from "lucide-react";
 
 const navItems = [
@@ -16,6 +19,9 @@ const navItems = [
   { name: "Students", path: "/admin/students", icon: Users },
   { name: "Allotment", path: "/admin/allotment", icon: Building },
   { name: "Staff", path: "/admin/staff", icon: UserCheck },
+  { name: "Payments", path: "/admin/payments", icon: CreditCard },
+  { name: "Logs", path: "/admin/logs", icon: ScrollText },
+  { name: "Requests", path: "/admin/requests", icon: ClipboardList }
 ];
 
 const AdminSidebar = () => {

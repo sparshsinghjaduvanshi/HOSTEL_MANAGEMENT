@@ -36,11 +36,7 @@ studentRouter.patch("/photo",  authorizeRoles("student"), upload.single("photo")
 // ================= DOCUMENT =================
 
 // Upload document (PDF only)
-studentRouter.post(
-  "/documents",
-  upload.array("files", 3), // max 3 files, // field name must match frontend
-  uploadDocument
-);
+studentRouter.post("/documents", upload.array("files", 3),  uploadDocument);// max 3 files, // field name must match frontend
 studentRouter.get("/documents", getDocuments);
 
 

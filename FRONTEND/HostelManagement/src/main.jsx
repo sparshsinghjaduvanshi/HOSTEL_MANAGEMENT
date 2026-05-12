@@ -47,6 +47,12 @@ import StaffProfile from "./pages/staff/Profile.jsx";
 import Payments from "./pages/student/Payments.jsx";
 import ApplicationDetails from "./pages/staff/ApplicationDetails.jsx";
 import StudentDetails from "./pages/staff/StudentDetails.jsx";
+import StudentDetailsAdmin from "./pages/admin/StudentDetails.jsx";
+import ApplicationDetailsAdmin from "./pages/admin/ApplicationDetailsAdmin.jsx";
+import AdminPayments from "./pages/admin/Payments.jsx";
+import Logs from "./pages/admin/Logs.jsx";
+import AdminRequests from "./pages/admin/Requests.jsx";
+import StaffRequests from "./pages/staff/Requests.jsx";
 
 //  Protected Route
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
@@ -76,6 +82,12 @@ const router = createBrowserRouter(
         <Route path="students" element={<Students />} />
         <Route path="allotment" element={<AdminAllotment />} />
         <Route path="staff" element={<Staff />} />
+        <Route path="students/:id" element={<StudentDetailsAdmin />}/>
+        <Route path="applications/:id" element={<ApplicationDetailsAdmin />}/>
+        <Route path="payments" element={<AdminPayments />}/>
+        <Route path="logs" element={<Logs />} />
+        <Route path="requests" element={<AdminRequests />}/>
+      
       </Route>
 
       {/* Student */}
@@ -114,7 +126,8 @@ const router = createBrowserRouter(
         <Route path="profile" element={<StaffProfile />} />
         <Route path="applications" element={<StaffApplications />} />
         <Route path="application/:id" element={<ApplicationDetails />} />
-        <Route path="/staff/students/:id" element={<StudentDetails />}/>
+        <Route path="students/:id" element={<StudentDetails />}/>
+        <Route path="requests" element={<StaffRequests />}/>
       </Route>
     </Route>
 

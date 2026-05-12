@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   getAllStudents,
   deleteStudent,
@@ -21,15 +22,11 @@ const Students = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const navigate = useNavigate();
 
-  const [selectedStudent, setSelectedStudent] =
-    useState(null);
-
-  const [documents, setDocuments] =
-    useState([]);
-
-  const [docLoading, setDocLoading] =
-    useState(false);
+  const [docLoading, setDocLoading] = useState(false);
 
   const fetchStudents = async () => {
     try {
@@ -84,75 +81,73 @@ const Students = () => {
       alert(
         err.response?.data
           ?.message ||
-          "Delete failed"
+        "Delete failed"
       );
     }
   };
 
-  const openStudent =
-    async (student) => {
-      try {
-        setSelectedStudent(
-          student
+  const openStudent = async (student) => {
+    try {
+      setSelectedStudent(
+        student
+      );
+
+      setDocLoading(true);
+      setDocuments([]);
+
+      const res =
+        await getStudentDocuments(
+          student._id
         );
 
-        setDocLoading(true);
-        setDocuments([]);
-
-        const res =
-          await getStudentDocuments(
-            student._id
-          );
-
-        setDocuments(
-          res.data.data || []
-        );
-      } catch {
-        alert(
-          "Failed to load documents"
-        );
-      } finally {
-        setDocLoading(false);
-      }
-    };
+      setDocuments(
+        res.data.data || []
+      );
+    } catch {
+      alert(
+        "Failed to load documents"
+      );
+    } finally {
+      setDocLoading(false);
+    }
+  };
 
   const closeModal = () => {
     setSelectedStudent(null);
     setDocuments([]);
   };
 
-  const filteredStudents =
-    useMemo(() => {
-      const q =
-        search
-          .toLowerCase()
-          .trim();
+  const filteredStudents = useMemo(() => {
+    const q =
+      search
+        .toLowerCase()
+        .trim();
 
-      return students.filter(
-        (s) => {
-          const name =
-            s.userId?.fullName
-              ?.toLowerCase() ||
-            "";
+    return students.filter(
+      (s) => {
+        const name =
+          s.userId?.fullName
+            ?.toLowerCase() ||
+          "";
 
-          const email =
-            s.userId?.email
-              ?.toLowerCase() ||
-            "";
+        const email =
+          s.userId?.email
+            ?.toLowerCase() ||
+          "";
 
-          const enroll =
-            s.enrollmentNo
-              ?.toLowerCase() ||
-            "";
+        const enroll =
+          s.enrollmentNo
+            ?.toLowerCase() ||
+          "";
 
-          return (
-            name.includes(q) ||
-            email.includes(q) ||
-            enroll.includes(q)
-          );
-        }
-      );
-    }, [students, search]);
+        return (
+          name.includes(q) ||
+          email.includes(q) ||
+          enroll.includes(q)
+        );
+      }
+    );
+  }, [students, search]);
 
   return (
     <div className="space-y-8">
@@ -218,15 +213,13 @@ const Students = () => {
 
           {filteredStudents.map(
             (s) => {
-             const active = Boolean(s.userId?.isActive);
+              const active = Boolean(s.userId?.isActive);
 
               return (
                 <div
                   key={s._id}
                   onClick={() =>
-                    openStudent(
-                      s
-                    )
+                    navigate(`/admin/students/${s._id}`)
                   }
                   className="bg-white rounded-2xl shadow p-6 cursor-pointer hover:shadow-xl"
                 >
@@ -274,11 +267,10 @@ const Students = () => {
                   <div className="mt-5 flex justify-between items-center">
 
                     <span
-                      className={`px-3 py-1 text-xs rounded-full ${
-                        active
+                      className={`px-3 py-1 text-xs rounded-full ${active
                           ? "bg-green-100 text-green-700"
                           : "bg-red-100 text-red-700"
-                      }`}
+                        }`}
                     >
                       {active
                         ? "Active"

@@ -178,98 +178,273 @@ const updateProfilePhoto = asyncHandler(async (req, res) => {
 // ================= DOCUMENT =================
 
 const uploadDocument = asyncHandler(async (req, res) => {
+
   const student = await getOrCreateStudent(req.user);
 
   if (!student.isDocumentUploadAllowed) {
-    throw new ApiError(403, "Upload not allowed");
+    throw new ApiError(
+      403,
+      "Upload not allowed"
+    );
   }
 
   let { types, addresses } = req.body;
+
   const files = req.files;
 
-  if (!Array.isArray(types)) types = types ? [types] : [];
-  if (!Array.isArray(addresses)) addresses = addresses ? [addresses] : [];
-
-  if (!files || files.length === 0) {
-    throw new ApiError(400, "No files uploaded");
+  if (!Array.isArray(types)) {
+    types = types ? [types] : [];
   }
 
-  const allowedTypes = ["aadhaar", "address_proof", "id_card"];
+  if (!Array.isArray(addresses)) {
+    addresses = addresses
+      ? [addresses]
+      : [];
+  }
+
+  if (!files || files.length === 0) {
+    throw new ApiError(
+      400,
+      "No files uploaded"
+    );
+  }
+
+  const allowedTypes = [
+    "aadhaar",
+    "address_proof",
+    "id_card",
+  ];
+
   const uploadedDocs = [];
 
   for (let i = 0; i < files.length; i++) {
+
     const file = files[i];
-    const docType = sanitize(types[i]);
 
-    //  Validate document type
-    if (!allowedTypes.includes(docType)) {
-      throw new ApiError(400, `Invalid type: ${docType}`);
+    const docType = sanitize(
+      types[i]
+    );
+
+    // Validate document type
+
+    if (
+      !allowedTypes.includes(
+        docType
+      )
+    ) {
+
+      if (
+        fs.existsSync(file.path)
+      ) {
+        fs.unlinkSync(file.path);
+      }
+
+      throw new ApiError(
+        400,
+        `Invalid type: ${docType}`
+      );
     }
 
-    //  Validate file signature
-    const fileInfo = await fileTypeFromFile(file.path);
+    // Validate file signature
 
-    if (!fileInfo || fileInfo.mime !== "application/pdf") {
-      fs.unlinkSync(file.path); // cleanup
-      throw new ApiError(400, "Invalid file type (only PDF allowed)");
+    const fileInfo =
+      await fileTypeFromFile(
+        file.path
+      );
+
+    if (
+      !fileInfo ||
+      fileInfo.mime !==
+      "application/pdf"
+    ) {
+
+      if (
+        fs.existsSync(file.path)
+      ) {
+        fs.unlinkSync(file.path);
+      }
+
+      throw new ApiError(
+        400,
+        "Invalid file type (only PDF allowed)"
+      );
     }
 
-    //  File size check
-    if (file.size > 2 * 1024 * 1024) {
-      fs.unlinkSync(file.path);
-      throw new ApiError(400, "File too large (max 2MB)");
+    // File size check
+
+    if (
+      file.size >
+      50 * 1024 * 1024
+    ) {
+
+      if (
+        fs.existsSync(file.path)
+      ) {
+        fs.unlinkSync(file.path);
+      }
+
+      throw new ApiError(
+        400,
+        "File too large (max 50MB)"
+      );
     }
 
-    //  Address validation
-    const address =
-      docType === "address_proof"
-        ? sanitize(addresses[i])
+    // Address validation
+
+    const address = docType === "address_proof"
+        ? sanitize(
+          addresses[i]
+        )
         : undefined;
 
-    if (docType === "address_proof" && !address) {
-      fs.unlinkSync(file.path);
-      throw new ApiError(400, "Address required");
+    if (
+      docType ===
+      "address_proof" &&
+      !address
+    ) {
+
+      if (
+        fs.existsSync(file.path)
+      ) {
+        fs.unlinkSync(file.path);
+      }
+
+      throw new ApiError(
+        400,
+        "Address required"
+      );
     }
 
-    //  Prevent duplicate upload
+    // Prevent duplicate upload
+
     const existing = await Document.findOne({
-      studentId: student._id,
-      type: docType
-    });
+        studentId:
+          student._id,
+        type: docType,
+      });
 
     if (existing) {
-      fs.unlinkSync(file.path);
-      throw new ApiError(400, `${docType} already uploaded`);
+
+      if (
+        fs.existsSync(file.path)
+      ) {
+        fs.unlinkSync(file.path);
+      }
+
+      throw new ApiError(
+        400,
+        `${docType} already uploaded`
+      );
     }
 
-    //  Upload to Cloudinary
-    const uploaded = await uploadOnCLoudinary(file.path);
+    // Upload to Cloudinary
 
-    // (Cloudinary already deletes file, but safe to ensure)
-    if (fs.existsSync(file.path)) {
+    let uploaded;
+
+    try {
+
+      uploaded =
+        await uploadOnCLoudinary(
+          file.path
+        );
+
+    } catch (error) {
+
+      console.log(
+        "Cloudinary Upload Error:",
+        error
+      );
+
+      if (
+        fs.existsSync(file.path)
+      ) {
+        fs.unlinkSync(file.path);
+      }
+
+      throw new ApiError(
+        500,
+        "Cloudinary upload failed"
+      );
+    }
+
+    // Check upload result
+
+    if (
+      !uploaded ||
+      !uploaded.secure_url
+    ) {
+
+      console.log(
+        "Invalid Cloudinary Response:",
+        uploaded
+      );
+
+      if (
+        fs.existsSync(file.path)
+      ) {
+        fs.unlinkSync(file.path);
+      }
+
+      throw new ApiError(
+        500,
+        "Failed to upload file"
+      );
+    }
+
+    // Cleanup local file
+
+    if (
+      fs.existsSync(file.path)
+    ) {
       fs.unlinkSync(file.path);
     }
 
-    const document = await Document.create({
-      studentId: student._id,
-      type: docType,
-      fileUrl: uploaded.secure_url,
-      address
-    });
+    // Save document
 
-    uploadedDocs.push(document);
+    const document =
+      await Document.create({
+        studentId:
+          student._id,
+
+        type: docType,
+
+        fileUrl:
+          uploaded.secure_url,
+
+        address,
+      });
+
+    uploadedDocs.push(
+      document
+    );
   }
 
   await createLog(req, {
+
     userId: req.user._id,
+
     action: "UPLOAD",
-    targetTable: "Document",
-    newData: { count: uploadedDocs.length }
+
+    targetTable:
+      "Document",
+
+    newData: {
+      count:
+        uploadedDocs.length,
+    },
+
   }).catch(() => { });
 
   return res.status(201).json(
-    new ApiResponse(201, uploadedDocs, "Documents uploaded")
+
+    new ApiResponse(
+      201,
+      uploadedDocs,
+      "Documents uploaded"
+    )
+
   );
+
 });
 
 

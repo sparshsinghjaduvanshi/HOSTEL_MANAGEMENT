@@ -7,7 +7,7 @@ export const getStaffDashboard = () =>
 
 // ================= COMPLAINTS =================
 
-export const getStaffComplaints = () =>
+export const getMyComplaints = () =>
   API.get("/staff/complaints");
 
 export const updateComplaintStatus = (id, status) =>
@@ -25,11 +25,7 @@ export const getHostelStudents = () =>
 export const getWardenApplications = () =>
   API.get("/staff/applications");
 
-export const reviewApplication = (
-  applicationId,
-  action,
-  remarks = ""
-) =>
+export const reviewApplication = ( applicationId, action, remarks = "") =>
   API.patch("/staff/applications/review", {
     applicationId,
     action,
@@ -41,19 +37,13 @@ export const reviewApplication = (
 export const getRoomChangeRequests = () =>
   API.get("/staff/room-changes");
 
-export const decideRoomChange = (
-  id,
-  action,
-  newRoomId
-) =>
+export const decideRoomChange = ( id, action,newRoomId) =>
   API.patch(`/staff/room-changes/${id}`, {
     action,
     newRoomId,
   });
 
-export const getStudentDetails =
-  (id) => {
-
+export const getStudentDetails = (id) => {
     return API.get(
       `/staff/students/${id}`
     );

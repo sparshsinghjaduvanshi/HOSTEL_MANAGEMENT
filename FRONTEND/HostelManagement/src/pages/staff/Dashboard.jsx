@@ -1,19 +1,12 @@
 import { useEffect, useState } from "react";
-
-import {
-  getStaffComplaints
-} from "../../services/staff.service";
+import { getMyComplaints } from "../../services/staff.service";
 
 export default function Dashboard() {
 
-  const [complaints, setComplaints] =
-    useState([]);
+  const [complaints, setComplaints] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
   useEffect(() => {
     fetchDashboard();
   }, []);
@@ -25,7 +18,7 @@ export default function Dashboard() {
       setLoading(true);
 
       const res =
-        await getStaffComplaints();
+        await  getMyComplaints();
 
       setComplaints(
         res.data.complaints || []
@@ -45,8 +38,6 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
-
-
 
   const stats = [
     {

@@ -8,7 +8,8 @@ import {
   uploadPaymentReceipt,
   verifyPayment,
   freezeExpiredAllotments,
-  createPaymentOrder
+  createPaymentOrder,
+  getPendingPayments
 } from "../controllers/payment.controller.js";
 
 import {
@@ -91,6 +92,15 @@ paymentRouter.post(
   authorizeRoles("student"),
 
   createPaymentOrder
+);
+paymentRouter.get(
+  "/pending",
+
+  verifyJWT,
+
+  authorizeRoles("admin"),
+
+  getPendingPayments
 );
 
 export default paymentRouter;

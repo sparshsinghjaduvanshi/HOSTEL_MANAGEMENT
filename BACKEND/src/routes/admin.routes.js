@@ -13,8 +13,17 @@ import {
   updateStaffPhoto,
   forceCloseCycle,
   deleteStaff,
-  getStudentDocuments
+  getStudentDocuments,
+  getStudentDetails,
+  getApplicationDetails,
+  getAllComplaints,
+  getAllRoomChanges
 } from "../controllers/admin.controller.js";
+
+// import {
+//   getMyComplaints,
+//   getRoomChangeRequests
+// } from "../controllers/staff.controller.js";
 
 import {
   reviewApplication,
@@ -55,11 +64,13 @@ adminRouter.put("/staff/:id", updateStaff);
 adminRouter.delete("/staff/:id", deleteStaff);
 adminRouter.patch("/staff/:id/photo", upload.single("photo"), updateStaffPhoto);
 adminRouter.get("/students/:id/documents", getStudentDocuments);
+adminRouter.get("/students/:id", getStudentDetails);
 /**
  * APPLICATION MANAGEMENT
  */
 adminRouter.get("/applications", getAllApplicationsAdmin);
 adminRouter.post("/applications/review", reviewApplication);
+adminRouter.get("/applications/:id", getApplicationDetails);
 
 /**
  * ALLOTMENT
@@ -74,5 +85,10 @@ adminRouter.get("/allotment/allotted", getAllottedStudents);
  */
 adminRouter.patch("/cycle/toggle-application", toggleApplicationWindow);
 adminRouter.patch("/cycle/force-close", forceCloseCycle);
+
+
+
+adminRouter.get("/complaints", getAllComplaints);
+adminRouter.get( "/room-changes", getAllRoomChanges);
 
 export default adminRouter;

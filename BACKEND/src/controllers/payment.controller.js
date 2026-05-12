@@ -374,10 +374,44 @@ const freezeExpiredAllotments = asyncHandler(async (req, res) => {
       )
     );
 });
+
+const getPendingPayments = asyncHandler(async (req, res) => {
+
+    const fees =
+      await Fee.find({
+        status: "pending"
+      })
+
+      .populate({
+        path: "allotmentId",
+
+        populate: {
+          path: "studentId",
+
+          populate: {
+            path: "userId"
+          }
+        }
+      })
+
+      .sort({
+        createdAt: -1
+      });
+
+    return res.status(200).json(
+
+      new ApiResponse(
+        200,
+        fees,
+        "Pending payments fetched"
+      )
+    );
+  });
 export {
   getMyPayment,
   uploadPaymentReceipt,
   verifyPayment,
   freezeExpiredAllotments,
-  createPaymentOrder
+  createPaymentOrder,
+  getPendingPayments
 };

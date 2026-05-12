@@ -24,3 +24,5 @@ export const createOrder = () =>
     API.post(
       "/payments/create-order"
     );
+
+export const getPendingPayments = () => API.get("/payments/pending");

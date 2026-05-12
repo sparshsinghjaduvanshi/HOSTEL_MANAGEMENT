@@ -9,11 +9,8 @@ const StaffSidebar = () => {
 
   const navigate = useNavigate();
 
-  const {
-    user,
-    setUser,
-    loading
-  } = useAuth(); console.log("USER:", user);
+  const { user, setUser, loading } = useAuth(); 
+  console.log("USER:", user);
   if (loading) {
     return (
       <div className="w-64 h-screen bg-gray-900" />

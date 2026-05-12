@@ -1,53 +1,28 @@
-// module.exports = {
-
-//   apps: [
-
-//     {
-
-//       name: "hostel-backend",
-
-//       script: "./src/index.js",
-
-//       instances: 3,
-
-//       exec_mode: "cluster",
-
-//       watch: false,
-
-//       env: {
-
-//         NODE_ENV: "development",
-
-//         PORT: 8000
-//       },
-
-//       node_args:
-//         "--experimental-modules"
-//     }
-//   ]
-// };
-
 module.exports = {
-
   apps: [
-
     {
-
       name: "hostel-backend",
 
       script: "./src/index.js",
 
-      instances: 3,
+      instances: 1,
 
-      exec_mode: "cluster",
+      exec_mode: "fork",
 
       watch: false,
 
       env: {
-
         PORT: 8000,
+        NODE_ENV: "production",
 
-        NODE_ENV: "production"
+        CLOUDINARY_CLOUD_NAME:
+          process.env.CLOUDINARY_CLOUD_NAME,
+
+        CLOUDINARY_API_KEY:
+          process.env.CLOUDINARY_API_KEY,
+
+        CLOUDINARY_API_SECRET:
+          process.env.CLOUDINARY_API_SECRET
       }
     }
   ]

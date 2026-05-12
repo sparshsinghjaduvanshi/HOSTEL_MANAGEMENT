@@ -5,133 +5,45 @@ import {
   FileText,
   Repeat,
   User,
+  ClipboardList
 } from "lucide-react";
 
 export const sidebarConfig = {
 
   Cleaner: [
-    {
-      name: "Dashboard",
-      path: "/staff/dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      name: "Complaints",
-      path: "/staff/complaints",
-      icon: Wrench,
-    },
-    {
-      name: "Profile",
-      path: "/staff/profile",
-      icon: User,
-    },
+    { name: "Dashboard", path: "/staff/dashboard",icon: LayoutDashboard,},
+    { name: "Complaints",path: "/staff/complaints",icon: Wrench,},
+    { name: "Profile", path: "/staff/profile", icon: User,},
   ],
-
   Carpenter: [
-    {
-      name: "Dashboard",
-      path: "/staff/dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      name: "Complaints",
-      path: "/staff/complaints",
-      icon: Wrench,
-    },
-    {
-      name: "Profile",
-      path: "/staff/profile",
-      icon: User,
-    },
+    { name: "Dashboard", path: "/staff/dashboard", icon: LayoutDashboard,},
+    { name: "Complaints", path: "/staff/complaints",icon: Wrench},
+    { name: "Profile", path: "/staff/profile",icon: User,},
   ],
 
   Electrician: [
-    {
-      name: "Dashboard",
-      path: "/staff/dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      name: "Complaints",
-      path: "/staff/complaints",
-      icon: Wrench,
-    },
-    {
-      name: "Profile",
-      path: "/staff/profile",
-      icon: User,
-    },
+    {name: "Dashboard",path: "/staff/dashboard",icon: LayoutDashboard,},
+    {name: "Complaints",path: "/staff/complaints",icon: Wrench,},
+    {name: "Profile",path: "/staff/profile",icon: User,},
   ],
 
   CareTaker: [
-    {
-      name: "Dashboard",
-      path: "/staff/dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      name: "Complaints",
-      path: "/staff/complaints",
-      icon: Wrench,
-    },
-    {
-      name: "Students",
-      path: "/staff/students",
-      icon: Users,
-    },
-    {
-      name: "Applications",
-      path: "/staff/applications",
-      icon: FileText,
-    },
-    {
-      name: "Room Changes",
-      path: "/staff/room-changes",
-      icon: Repeat,
-    },
-    {
-      name: "Profile",
-      path: "/staff/profile",
-      icon: User,
-    },
+    { name: "Dashboard",path: "/staff/dashboard",icon: LayoutDashboard,},
+    { name: "Complaints", path: "/staff/complaints", icon: Wrench,},
+    { name: "Students", path: "/staff/students", icon: Users,},
+    { name: "Applications",path: "/staff/applications", icon: FileText,},
+    { name: "Room Changes",path: "/staff/room-changes",icon: Repeat,},
+    { name: "Profile", path: "/staff/profile", icon: User, },
+    { name: "Requests", path: "/admin/requests", icon: ClipboardList }
   ],
 
   Warden: [
-
-  {
-    name: "Dashboard",
-    path: "/staff/dashboard",
-    icon: LayoutDashboard,
-  },
-
-  {
-    name: "Applications",
-    path: "/staff/applications",
-    icon: FileText,
-  },
-
-  {
-    name: "Students",
-    path: "/staff/students",
-    icon: Users,
-  },
-
-  {
-    name: "Complaints",
-    path: "/staff/complaints",
-    icon: Wrench,
-  },
-
-  {
-    name: "Room Changes",
-    path: "/staff/room-changes",
-    icon: Repeat,
-  },
-
-  {
-    name: "Profile",
-    path: "/staff/profile",
-    icon: User,
-  },
+  { name: "Dashboard", path: "/staff/dashboard",icon: LayoutDashboard,},
+  { name: "Applications", path: "/staff/applications", icon: FileText,},
+  { name: "Students", path: "/staff/students", icon: Users,},
+  { name: "Complaints", path: "/staff/complaints", icon: Wrench,},
+  { name: "Room Changes", path: "/staff/room-changes", icon: Repeat,},
+  { name: "Profile", path: "/staff/profile", icon: User,},
+  { name: "Requests", path: "/admin/requests", icon: ClipboardList }
 ],
 };

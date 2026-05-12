@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import validator from "validator";
+import { sendEmail } from "../utils/sendEmail.js";
 
 import { User } from "../models/user.model.js";
 import { Student } from "../models/student.model.js";
@@ -8,6 +9,9 @@ import { Application } from "../models/application.model.js";
 import { AllotmentCycle } from "../models/allotementCycle.model.js";
 import { Admin } from "../models/admin.model.js";
 import {Document} from "../models/document.model.js"
+
+import { Complaint }from "../models/maintenance.model.js";
+import { RoomChangeRequest }from "../models/roomChangeRequest.model.js";
 
 // import { createLog } from "../services/log.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -554,6 +558,145 @@ const getStudentDocuments = asyncHandler(async (req, res) => {
   );
 });
 
+const getStudentDetails = asyncHandler(async (req, res) => {
+
+    const student =
+      await Student.findById(
+        req.params.id
+      ).populate("userId");
+
+    if (!student) {
+
+      throw new ApiError(
+        404,
+        "Student not found"
+      );
+    }
+
+    const application =
+      await Application.findOne({
+        studentId: student._id
+      })
+      .populate("allottedHostel")
+      .populate("roomId");
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          student,
+          application
+        },
+        "Student details fetched successfully"
+      )
+    );
+  });
+
+  const getApplicationDetails = asyncHandler(async (req, res) => {
+
+    const application =
+      await Application.findById(
+        req.params.id
+      )
+
+      .populate({
+        path: "studentId",
+
+        populate: {
+          path: "userId"
+        }
+      })
+
+      .populate("preferences")
+
+      .populate("allottedHostel")
+
+      .populate("roomId");
+
+    if (!application) {
+
+      throw new ApiError(
+        404,
+        "Application not found"
+      );
+    }
+
+    const documents =
+      await Document.find({
+        studentId:
+          application.studentId._id
+      });
+
+    return res.status(200).json(
+
+      new ApiResponse(
+        200,
+        {
+          application,
+          documents
+        },
+        "Application details fetched"
+      )
+    );
+  });
+
+  const getAllComplaints = asyncHandler(async (req, res) => {
+
+    const complaints =
+      await Complaint.find()
+
+      .populate({
+        path: "studentId",
+
+        populate: {
+          path: "userId"
+        }
+      })
+
+      .sort({
+        createdAt: -1
+      });
+
+    return res.status(200).json({
+
+      success: true,
+
+      data: complaints
+    });
+  });
+
+const getAllRoomChanges = asyncHandler(async (req, res) => {
+
+    const requests =
+      await RoomChangeRequest.find()
+
+      .populate({
+        path: "requester",
+
+        populate: {
+          path: "userId"
+        }
+      })
+
+      .populate({
+        path: "targetStudent",
+
+        populate: {
+          path: "userId"
+        }
+      })
+
+      .sort({
+        createdAt: -1
+      });
+
+    return res.status(200).json({
+
+      success: true,
+
+      data: requests
+    });
+  });
 
 // ================= EXPORT =================
 
@@ -572,5 +715,9 @@ export {
   closeCycle,
   forceCloseCycle,
   deleteStaff,
-  getStudentDocuments
+  getStudentDocuments,
+  getStudentDetails,
+  getApplicationDetails,
+  getAllComplaints,
+  getAllRoomChanges
 };
